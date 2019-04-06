@@ -17,5 +17,7 @@
     "num_labels": 10,
 
     "num_parallel_calls": 4,
-    "save_summary_steps": 10
+    "save_summary_steps": 10,
+
+    "model": "base"
 }

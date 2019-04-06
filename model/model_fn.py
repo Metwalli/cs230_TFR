@@ -1,8 +1,7 @@
 """Define the model."""
 
 import tensorflow as tf
-from .densenet_model import DenseNet
-from .densenet_updated_model import DenseNet
+from .densenet_model import DenseNetBase, DenseNetUpdated
 from .smallervggnet import SmallerVGGNet
 def build_model(is_training, inputs, params):
     """Compute logits of the model (output distribution)
@@ -71,9 +70,13 @@ def model_fn(mode, inputs, params, reuse=False):
     # MODEL: define the layers of the model
     with tf.variable_scope('model', reuse=reuse):
         # Compute the output distribution of the model and the predictions
-        logits = build_model(is_training, inputs, params)
+        if params.model == 'base':
+            logits = DenseNetBase(x=inputs, params=params, reuse=reuse, is_training=is_training).model
+        else:
+            logits = DenseNetUpdated(x=inputs, params=params, reuse=reuse, is_training=is_training).model
+        # logits = build_model(is_training, inputs, params)
         # logits = SmallerVGGNet.build(is_training, inputs, params)
-        logits = DenseNet(x=inputs, params=params, reuse=reuse, is_training=is_training).model
+
         predictions = tf.argmax(logits, 1)
 
     # Define loss and accuracy

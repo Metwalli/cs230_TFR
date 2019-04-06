@@ -30,7 +30,7 @@ def Max_Pooling(x, pool_size=[3,3], stride=2, padding='SAME'):
     return tf.layers.max_pooling2d(inputs=x, pool_size=pool_size, strides=stride, padding=padding)
 
 
-class DenseNet():
+class DenseNetUpdated():
     def __init__(self, x, params, reuse, is_training):
         self.nb_blocks = 3
         self.params = params
@@ -112,7 +112,7 @@ class DenseNet():
             #     out = self.transition_layer(out, scope='trans_'+str(i))
             #     self.num_filters = int(self.num_filters * self.params.compression_rate)
             #x = self.dense_block(input_x=x, nb_layers=32, layer_name='dense_final')
-            
+
             # 100 Layer
             '''
             # out = tf.reshape(out, [-1, 1 * 1 * self.num_filters])

@@ -17,8 +17,10 @@ def build_model(is_training, inputs, params):
         output: (tf.Tensor) output of the model
     """
     images = inputs['images']
+    # tf.reshape(images, [None, params.image_size, params.image_size, 3])
 
-    assert images.get_shape().as_list() == [None, params.image_size, params.image_size, 3]
+    print(images.shape)
+    # assert images.get_shape().as_list() == [None, params.image_size, params.image_size, 3]
 
     out = images
     # Define the number of channels of each convolution
@@ -69,10 +71,9 @@ def model_fn(mode, inputs, params, reuse=False):
     # MODEL: define the layers of the model
     with tf.variable_scope('model', reuse=reuse):
         # Compute the output distribution of the model and the predictions
-        # logits = build_model(is_training, inputs, params)
+        logits = build_model(is_training, inputs, params)
         # logits = SmallerVGGNet.build(is_training, inputs, params)
         # logits = DenseNet(x=inputs, params=params, reuse=reuse, is_training=is_training).model
-        logits = DenseNet(x=inputs, params=params, reuse=reuse, is_training=is_training).model
         predictions = tf.argmax(logits, 1)
 
     # Define loss and accuracy

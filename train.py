@@ -18,20 +18,12 @@ from model.training import train_and_evaluate
 parser = argparse.ArgumentParser()
 parser.add_argument('--model_dir', default='experiments/base_model',
                     help="Experiment directory containing params.json")
-parser.add_argument('--data_dir', default='c:\data\VIREO\\food224',
+parser.add_argument('--train_tf', default='c:\data\VIREO\\food224',
+                    help="Directory containing the dataset"),
+parser.add_argument('--eval_tf', default='c:\data\VIREO\\food224',
                     help="Directory containing the dataset")
 parser.add_argument('--restore_from', default=None,
                     help="Optional, directory or file containing weights to reload before training")
-
-def get_labels(imagePaths, classes):
-    labels = []
-    class_to_ix = dict(zip(classes, range(len(classes))))
-    ix_to_class = dict(zip(range(len(classes)), classes))
-    class_to_ix = {v: k for k, v in ix_to_class.items()}
-    for p in imagePaths:
-        labels.append(class_to_ix[p.split(os.path.sep)[-2]])
-
-    return labels
 
 if __name__ == '__main__':
     # Set the random seed for the whole graph for reproductible experiments
@@ -54,23 +46,18 @@ if __name__ == '__main__':
 
     # Create the input data pipeline
     logging.info("Creating the datasets...")
-    data_dir = args.data_dir
+    train_tfrecord = args.train_tf
+    eval_tfrecord = args.eval_tf
 
     # Get the filenames from the train and dev sets
-    train_filenames = sorted(list(paths.list_images(os.path.join(data_dir, "train"))))
-    eval_filenames = sorted(list(paths.list_images(os.path.join(data_dir, "test"))))
-
-    classes_list = os.listdir(os.path.join(data_dir, "train"))
-    train_labels = get_labels(train_filenames, classes_list)
-    eval_labels = get_labels(eval_filenames, classes_list)
 
     # Specify the sizes of the dataset we train on and evaluate on
-    params.train_size = len(train_filenames)
-    params.eval_size = len(eval_filenames)
+    params.train_size = len([x for x in tf.python_io.tf_record_iterator(train_tfrecord)])
+    params.eval_size = len([x for x in tf.python_io.tf_record_iterator(eval_tfrecord)])
 
     # Create the two iterators over the two datasets
-    train_inputs = input_fn(True, train_filenames, train_labels, params)
-    eval_inputs = input_fn(False, eval_filenames, eval_labels, params)
+    train_inputs = input_fn(True, train_tfrecord, params)
+    eval_inputs = input_fn(False, eval_tfrecord, params)
 
     # Define the model
     logging.info("Creating the model...")

@@ -26,6 +26,7 @@ class GenerateTFRecord:
         with tf.python_io.TFRecordWriter(tfrecord_file_name) as writer:
             for img_path in tqdm(imagePaths):
                 example = self._convert_image(img_path)
+                print(img_path)
                 writer.write(example.SerializeToString())
 
     def _convert_image(self, img_path):

@@ -25,12 +25,8 @@ class GenerateTFRecord:
 
         with tf.python_io.TFRecordWriter(tfrecord_file_name) as writer:
             for img_path in tqdm(imagePaths):
-                img_shape = mpimg.imread(img_path).shape
-                if len(img_shape) < 3:
-                    print(img_path)
-                # example = self._convert_image(img_path)
-                #
-                # writer.write(example.SerializeToString())
+                example = self._convert_image(img_path)
+                writer.write(example.SerializeToString())
 
     def _convert_image(self, img_path):
         label, class_name = self._get_label_with_filename(img_path)

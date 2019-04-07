@@ -39,13 +39,31 @@ class DenseNetUpdated():
         self.is_training = is_training
         self.model = self.Dense_net(x)
 
+    def inception_module_A(self, x, scope):
+        x1 = conv_layer(x, 32, kernel=[1, 1], layer_name=scope + "ince_convX1")
+        x2 = conv_layer(x, 32, kernel=[1, 1], layer_name=scope + "ince_convX2_1")
+        x2 = tf.layers.batch_normalization(x2, momentum=self.params.bn_momentum, training=self.is_training)
+        x2 = tf.nn.relu(x2)
+        x2 = conv_layer(x2, 32, kernel=[3, 3], layer_name=scope + "ince_convX2_1")
+        x3 = conv_layer(x, 32, kernel=[1, 1], layer_name=scope + "ince_convX3_1")
+        x3 = tf.layers.batch_normalization(x3, momentum=self.params.bn_momentum, training=self.is_training)
+        x3 = tf.nn.relu(x3)
+        x3 = conv_layer(x3, 48, kernel=[3, 3], layer_name=scope + "ince_convX3_2")
+        x3 = tf.layers.batch_normalization(x3, momentum=self.params.bn_momentum, training=self.is_training)
+        x3 = tf.nn.relu(x3)
+        x3 = conv_layer(x3, 64, kernel=[3, 3], layer_name=scope + "ince_convX3_3")
+        concat = tf.concat([x1, x2, x3], axis=3)
+        concat = tf.layers.batch_normalization(concat, momentum=self.params.bn_momentum, training=self.is_training)
+        concat = tf.nn.relu(concat)
+        x4 = conv_layer(concat, 384, kernel=[1, 1], layer_name=scope + "ince_convX4")
+
+        return x4
     def transition_layer(self, x, scope):
         with tf.name_scope(scope):
             x = tf.layers.batch_normalization(x, epsilon=self.params.eps, momentum=self.params.bn_momentum,
                                               training=self.is_training)
             x = tf.nn.relu(x)
-            num_output_channels = int(self.num_filters * self.params.compression_rate)
-            x = conv_layer(x, num_output_channels, kernel=[1, 1], layer_name=scope + '_conv1')
+            x = self.inception_module_A(x, scope)
             if self.params.dropout_rate > 0:
                 x = tf.layers.dropout(x, rate=self.params.dropout_rate, training=self.is_training)
             x = Average_pooling(x, pool_size=[2, 2], stride=2)
@@ -56,13 +74,13 @@ class DenseNetUpdated():
             x = tf.layers.batch_normalization(x, momentum=self.params.bn_momentum, training=self.is_training)
             x = tf.nn.relu(x)
             num_channels = no_filters * 4
-            x = conv_layer(x, filter=num_channels, kernel=[1, 3], layer_name=scope + '_conv1')
+            x = conv_layer(x, filter=num_channels, kernel=[1, 1], layer_name=scope + '_conv1')
             if self.params.dropout_rate > 0:
                 x = tf.layers.dropout(x, rate=self.params.dropout_rate, training=self.is_training)
             x = tf.layers.batch_normalization(x, epsilon=self.params.eps, momentum=self.params.bn_momentum,
                                               training=self.is_training)
             x = tf.nn.relu(x)
-            x = conv_layer(x, filter=no_filters, kernel=[3, 1], layer_name=scope + '_conv2')
+            x = conv_layer(x, filter=no_filters, kernel=[3, 3], layer_name=scope + '_conv2')
             if self.params.dropout_rate > 0:
                 x = tf.layers.dropout(x, rate=self.params.dropout_rate, training=self.is_training)
 

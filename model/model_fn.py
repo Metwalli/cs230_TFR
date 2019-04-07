@@ -72,10 +72,12 @@ def model_fn(mode, inputs, params, reuse=False):
         # Compute the output distribution of the model and the predictions
         if params.model == 'base':
             logits = DenseNetBase(x=inputs, params=params, reuse=reuse, is_training=is_training).model
-        else:
+        elif params.model == "updated":
             logits = DenseNetUpdated(x=inputs, params=params, reuse=reuse, is_training=is_training).model
-        # logits = build_model(is_training, inputs, params)
-        # logits = SmallerVGGNet.build(is_training, inputs, params)
+        elif params.model == "vgg":
+            logits = SmallerVGGNet.build(is_training, inputs, params)
+        else:
+            logits = build_model(is_training, inputs, params)
 
         predictions = tf.argmax(logits, 1)
 

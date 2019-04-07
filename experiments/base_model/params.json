@@ -10,7 +10,7 @@
     "bn_momentum": 0.9,
     "dropout_rate": 0.5,
     "compression_rate": 1.0,
-    "num_layers_per_block": [1, 1, 2, 1],
+    "num_layers_per_block": [1, 1, 1, 1],
 
     "image_size": 224,
     "use_random_flip": true,
@@ -19,5 +19,5 @@
     "num_parallel_calls": 4,
     "save_summary_steps": 10,
 
-    "model": "base"
+    "model": "updated"
 }

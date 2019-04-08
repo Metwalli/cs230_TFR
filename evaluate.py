@@ -16,7 +16,7 @@ from model.utils import set_logger
 parser = argparse.ArgumentParser()
 parser.add_argument('--model_dir', default='experiments/test',
                     help="Experiment directory containing params.json")
-parser.add_argument('--data_file', default='data/test.tfrecord',
+parser.add_argument('--test_tf', default='data/test.tfrecord',
                     help="Directory containing the testTFRecord file")
 parser.add_argument('--restore_from', default='best_weights',
                     help="Subdirectory of model dir or file containing the weights")

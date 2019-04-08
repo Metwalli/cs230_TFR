@@ -54,7 +54,7 @@ if __name__ == '__main__':
     # Specify the sizes of the dataset we train on and evaluate on
     params.train_size = len([x for x in tf.python_io.tf_record_iterator(train_tfrecord)])
     params.eval_size = len([x for x in tf.python_io.tf_record_iterator(eval_tfrecord)])
-    print(params.train_size, "+", params.eval_size, "=", params.train_size + int(params.eval_size))
+
     # Create the two iterators over the two datasets
     train_inputs = input_fn(True, train_tfrecord, params)
     eval_inputs = input_fn(False, eval_tfrecord, params)

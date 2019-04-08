@@ -16,8 +16,8 @@ from model.utils import set_logger
 parser = argparse.ArgumentParser()
 parser.add_argument('--model_dir', default='experiments/test',
                     help="Experiment directory containing params.json")
-parser.add_argument('--data_dir', default='data/64x64_SIGNS',
-                    help="Directory containing the dataset")
+parser.add_argument('--data_file', default='data/test.tfrecord',
+                    help="Directory containing the testTFRecord file")
 parser.add_argument('--restore_from', default='best_weights',
                     help="Subdirectory of model dir or file containing the weights")
 
@@ -37,20 +37,15 @@ if __name__ == '__main__':
 
     # Create the input data pipeline
     logging.info("Creating the dataset...")
-    data_dir = args.data_dir
-    test_data_dir = os.path.join(data_dir, "test_signs")
 
     # Get the filenames from the test set
-    test_filenames = os.listdir(test_data_dir)
-    test_filenames = [os.path.join(test_data_dir, f) for f in test_filenames if f.endswith('.jpg')]
+    test_tfrecord = args.test_tf
 
-    test_labels = [int(f.split('/')[-1][0]) for f in test_filenames]
+    # Create the two iterators over the two datasets
+    test_inputs = input_fn(False, test_tfrecord, params)
 
     # specify the size of the evaluation set
-    params.eval_size = len(test_filenames)
-
-    # create the iterator over the dataset
-    test_inputs = input_fn(False, test_filenames, test_labels, params)
+    params.eval_size = len([x for x in tf.python_io.tf_record_iterator(test_tfrecord)])
 
     # Define the model
     logging.info("Creating the model...")

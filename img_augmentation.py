@@ -5,7 +5,7 @@ import os
 import random
 from imutils import paths
 from tqdm import tqdm
-from build_dataset_food_dev import get_images_data
+import argparse
 datagen = ImageDataGenerator(
         rotation_range=45,
         width_shift_range=0.3,
@@ -14,6 +14,16 @@ datagen = ImageDataGenerator(
         zoom_range=0.3,
         horizontal_flip=True,
         fill_mode='nearest')
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--data_dir',
+                    help="Data Directory")
+parser.add_argument('--no_aug',
+                    help="Number of Augmentations"),
+
+args = parser.parse_args()
+data_dir = args.data_dir
+no_aug = int(args.no_aug)
 
 def img_augmentation(img, output_dir, filename):
     x = img_to_array(img)  # convert image to numpy array
@@ -25,10 +35,10 @@ def img_augmentation(img, output_dir, filename):
     for batch in datagen.flow(x, batch_size=1, save_to_dir=output_dir, save_prefix=filename, save_format='jpg'):
 
         num_image_generated += 1
-        if num_image_generated == 5:
+        if num_image_generated == no_aug:
             break # stop the loop after num_image_generated iterations
 
-data_dir = "C:\data\VIREO\\food-10"
+
 
 imagePaths = sorted(list(paths.list_images(data_dir)))
 labels = []

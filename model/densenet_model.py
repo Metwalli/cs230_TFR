@@ -161,21 +161,21 @@ class DenseNetInception():
             # define list contain the number layers in blocks the length of list based on the number blocks in the model
 
             out = self.dense_block(input_x=out, nb_layers=self.params.num_layers_per_block[0], layer_name='dense_1')
-            out = self.inception_module_A(out, scope='trans_1')
+            out = self.inception_module_A(out, scope='inceptA')
             if self.params.dropout_rate > 0:
                 out = tf.layers.dropout(out, rate=self.params.dropout_rate, training=self.is_training)
             out = Average_pooling(out, pool_size=[2, 2], stride=2)
             self.num_filters = int(self.num_filters * self.params.compression_rate)
 
             out = self.dense_block(input_x=out, nb_layers=self.params.num_layers_per_block[1], layer_name='dense_2')
-            out = self.inception_module_B(out, scope='trans_1')
+            out = self.inception_module_B(out, scope='inceptB')
             if self.params.dropout_rate > 0:
                 out = tf.layers.dropout(out, rate=self.params.dropout_rate, training=self.is_training)
             out = Average_pooling(out, pool_size=[2, 2], stride=2)
             self.num_filters = int(self.num_filters * self.params.compression_rate)
 
             out = self.dense_block(input_x=out, nb_layers=self.params.num_layers_per_block[2], layer_name='dense_3')
-            out = self.inception_module_C(out, scope='trans_1')
+            out = self.inception_module_C(out, scope='inceptC')
             if self.params.dropout_rate > 0:
                 out = tf.layers.dropout(out, rate=self.params.dropout_rate, training=self.is_training)
 

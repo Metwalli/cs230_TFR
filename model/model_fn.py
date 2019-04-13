@@ -1,8 +1,10 @@
 """Define the model."""
 
 import tensorflow as tf
-from .densenet_model import DenseNetBase, DenseNetUpdated
+from .densenet_model import DenseNetBase, DenseNetUpdated, DenseNetInception
 from .smallervggnet import SmallerVGGNet
+from .densenet_keras_model import densenet121_model
+
 def build_model(is_training, inputs, params):
     """Compute logits of the model (output distribution)
 
@@ -19,7 +21,7 @@ def build_model(is_training, inputs, params):
     # tf.reshape(images, [None, params.image_size, params.image_size, 3])
 
     print(images.shape)
-    # assert images.get_shape().as_list() == [None, params.image_size, params.image_size, 3]
+    assert images.get_shape().as_list() == [None, params.image_size, params.image_size, 3]
 
     out = images
     # Define the number of channels of each convolution
@@ -71,9 +73,12 @@ def model_fn(mode, inputs, params, reuse=False):
     with tf.variable_scope('model', reuse=reuse):
         # Compute the output distribution of the model and the predictions
         if params.model == 'base':
+            # logits = densenet121_model(img_rows=224, img_cols=224, color_type=3, num_classes=5)
             logits = DenseNetBase(x=inputs, params=params, reuse=reuse, is_training=is_training).model
         elif params.model == "updated":
             logits = DenseNetUpdated(x=inputs, params=params, reuse=reuse, is_training=is_training).model
+        elif params.model == "inception":
+            logits = DenseNetInception(x=inputs, params=params, reuse=reuse, is_training=is_training).model
         elif params.model == "vgg":
             logits = SmallerVGGNet.build(is_training, inputs, params)
         else:
@@ -87,8 +92,15 @@ def model_fn(mode, inputs, params, reuse=False):
 
     # Define training step that minimizes the loss with the Adam optimizer
     if is_training:
-        optimizer = tf.train.AdamOptimizer(learning_rate=params.learning_rate, epsilon=1.1e-5)
         global_step = tf.train.get_or_create_global_step()
+        decay_steps = int(params.train_size / params.batch_size * 2)
+        learning_rate = tf.train.exponential_decay(params.learning_rate,
+                                   global_step,
+                                   decay_steps,
+                                   0.94,
+                                   staircase=True,
+                                   name='exponential_decay_learning_rate')
+        optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate, epsilon=1.1e-5)
         if params.use_batch_norm:
             # Add a dependency to update the moving mean and variance for batch normalization
             with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):

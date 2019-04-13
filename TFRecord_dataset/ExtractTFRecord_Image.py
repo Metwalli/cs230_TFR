@@ -20,7 +20,8 @@ class TFRecordExtractor:
             'channels': tf.FixedLenFeature([], tf.int64),
             'image': tf.FixedLenFeature([], tf.string),
             'label': tf.FixedLenFeature([], tf.int64),
-            'class_name': tf.FixedLenFeature([], tf.string)
+            'name': tf.FixedLenFeature([], tf.string),
+            'no': tf.FixedLenFeature([], tf.string)
         }
 
         # Extract the data record
@@ -30,8 +31,9 @@ class TFRecordExtractor:
         img_shape = tf.stack([sample['rows'], sample['cols'], sample['channels']])
         label = sample['label']
         filename = sample['filename']
-        class_name = sample['class_name']
-        return [image, label, filename, img_shape, class_name]
+        food_name = sample['name']
+        food_no = sample['no']
+        return [image, label, filename, img_shape, food_name, food_no]
 
     def extract_image(self):
         # Create folder to store extracted images
@@ -58,16 +60,17 @@ class TFRecordExtractor:
                         print('Image {} not decoded properly'.format(image_data[2]))
                         continue
 
-                    file_name = str(image_data[1]) + "_" + image_data[4].decode('utf-8') + image_data[2].decode('utf-8')
-                    save_path = os.path.abspath(os.path.join(folder_path, file_name))
-                    mpimg.imsave(save_path, image_data[0])
+                    file_name = str( image_data[1]) + "_" + image_data[5].decode('utf-8') + "_" + image_data[4].decode('utf-8') + image_data[2].decode('utf-8')
+                    # save_path = os.path.abspath(os.path.join(folder_path, file_name))
+                    # mpimg.imsave(save_path, image_data[0])
                     i += 1
-                    print(i)
+                    print(file_name)
 
             except:
                 pass
+            sess.close()
 
 
 if __name__ == '__main__':
-    t = TFRecordExtractor('C:\data\\food_05_300x300\\test.tfrecord')
+    t = TFRecordExtractor('C:\data\VIREO\\172_67_33\\train\\train.tfrecord')
     t.extract_image()

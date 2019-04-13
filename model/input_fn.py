@@ -17,11 +17,12 @@ def _parse_function(tfrecord, size):
         'channels': tf.FixedLenFeature([], tf.int64),
         'image': tf.FixedLenFeature([], tf.string),
         'label': tf.FixedLenFeature([], tf.int64),
-        'class_name': tf.FixedLenFeature([], tf.string)
+        'name': tf.FixedLenFeature([], tf.string)
     }
 
     # Extract the data record
     sample = tf.parse_single_example(tfrecord, features)
+
 
     image_decoded = tf.image.decode_jpeg(sample['image'], channels=3)
 
@@ -30,7 +31,6 @@ def _parse_function(tfrecord, size):
     image = tf.image.convert_image_dtype(image_decoded, tf.float32)
     resized_image = tf.image.resize_images(image, [size, size])
     label = sample['label']
-
     return resized_image, label
 
 
@@ -75,7 +75,7 @@ def input_fn(is_training, tfrecord_file, params):
     if is_training:
         dataset = (tf.data.TFRecordDataset([tfrecord_file])
             .map(parse_fn, num_parallel_calls=params.num_parallel_calls)
-            # .map(train_fn, num_parallel_calls=params.num_parallel_calls)
+            .map(train_fn, num_parallel_calls=params.num_parallel_calls)
             .batch(params.batch_size)
             .prefetch(1)  # make sure you always have one batch ready to serve
         )

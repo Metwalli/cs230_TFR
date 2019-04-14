@@ -19,7 +19,7 @@ def Global_Average_Pooling(x, stride=1, name=None):
     It is global average pooling without tflearn
     """
 
-    return global_avg_pool(x, name=name)
+    return global_avg_pool(x, name='globas_actv')
     # But maybe you need to install h5py and curses or not
 
 def Average_pooling(x, pool_size=[2,2], stride=2, padding='SAME', name=None):
@@ -47,7 +47,7 @@ class DenseNetInception():
             x2 = conv_layer(x, 32, kernel=[1, 1], layer_name=scope + "ince_convX2_1")
             x2 = tf.layers.batch_normalization(x2, momentum=self.params.bn_momentum, training=self.is_training)
             x2 = tf.nn.relu(x2)
-            x2 = conv_layer(x2, 32, kernel=[3, 3], layer_name=scope + "ince_convX2_1")
+            x2 = conv_layer(x2, 32, kernel=[3, 3], layer_name=scope + "ince_convX2_2")
             x3 = conv_layer(x, 32, kernel=[1, 1], layer_name=scope + "ince_convX3_1")
             x3 = tf.layers.batch_normalization(x3, momentum=self.params.bn_momentum, training=self.is_training)
             x3 = tf.nn.relu(x3)
@@ -161,21 +161,21 @@ class DenseNetInception():
             # define list contain the number layers in blocks the length of list based on the number blocks in the model
 
             out = self.dense_block(input_x=out, nb_layers=self.params.num_layers_per_block[0], layer_name='dense_1')
-            out = self.inception_module_A(out, scope='inceptA')
+            out = self.inception_module_A(out, scope='inceptA_')
             if self.params.dropout_rate > 0:
                 out = tf.layers.dropout(out, rate=self.params.dropout_rate, training=self.is_training)
             out = Average_pooling(out, pool_size=[2, 2], stride=2)
             self.num_filters = int(self.num_filters * self.params.compression_rate)
 
             out = self.dense_block(input_x=out, nb_layers=self.params.num_layers_per_block[1], layer_name='dense_2')
-            out = self.inception_module_B(out, scope='inceptB')
+            out = self.inception_module_B(out, scope='inceptB_')
             if self.params.dropout_rate > 0:
                 out = tf.layers.dropout(out, rate=self.params.dropout_rate, training=self.is_training)
             out = Average_pooling(out, pool_size=[2, 2], stride=2)
             self.num_filters = int(self.num_filters * self.params.compression_rate)
 
             out = self.dense_block(input_x=out, nb_layers=self.params.num_layers_per_block[2], layer_name='dense_3')
-            out = self.inception_module_C(out, scope='inceptC')
+            out = self.inception_module_C(out, scope='inceptC_')
             if self.params.dropout_rate > 0:
                 out = tf.layers.dropout(out, rate=self.params.dropout_rate, training=self.is_training)
 

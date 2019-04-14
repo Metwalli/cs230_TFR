@@ -17,7 +17,8 @@ def _parse_function(tfrecord, size):
         'channels': tf.FixedLenFeature([], tf.int64),
         'image': tf.FixedLenFeature([], tf.string),
         'label': tf.FixedLenFeature([], tf.int64),
-        'name': tf.FixedLenFeature([], tf.string)
+        'name': tf.FixedLenFeature([], tf.string),
+        'no': tf.FixedLenFeature([], tf.string)
     }
 
     # Extract the data record

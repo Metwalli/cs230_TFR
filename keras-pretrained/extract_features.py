@@ -68,7 +68,10 @@ elif model_name == "resnet50":
     image_size = (224, 224)
 elif model_name == "inceptionv3":
     base_model = InceptionV3(include_top=include_top, weights=weights, input_tensor=Input(shape=(299,299,3)))
-    model = Model(input=base_model.input, output=base_model.get_layer('custom').output)
+    base_model.summary()
+    x = Dense(num_classes, activation="softmax")(base_model.get_layer('custom').output)
+    model = Model(input=base_model.input, output=x)
+    model.summary()
     image_size = (299, 299)
 elif model_name == "inceptionresnetv2":
     base_model = InceptionResNetV2(include_top=include_top, weights=weights, input_tensor=Input(shape=(299,299,3)))
@@ -118,7 +121,9 @@ for i, label in enumerate(train_labels):
         x = np.expand_dims(x, axis=0)
         x = preprocess_input(x)
         feature = model.predict(x)
+        print(feature.shape)
         flat = feature.flatten()
+        print(flat.shape)
         features.append(flat)
         labels.append(label)
         # print ("[INFO] processed - " + str(count))

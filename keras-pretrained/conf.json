@@ -3,8 +3,8 @@
   "weights"         : "imagenet",
   "include_top"     : false,
 
-  "train_path"      : "/home/ai309/metwalli/train",
-  "test_path"       : "/home/ai309/metwalli/test",
+  "train_path"      : "/home/ai309/metwalli/data/food_10_300x300/all-train",
+  "test_path"       : "/home/ai309/metwalli/data/food_10_300x300/all-train",
   "features_path"   : "output/flowers_17/inceptionv3/features.h5",
   "labels_path"     : "output/flowers_17/inceptionv3/labels.h5",
   "results"         : "output/flowers_17/inceptionv3/results.txt",

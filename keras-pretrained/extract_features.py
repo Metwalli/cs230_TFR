@@ -57,11 +57,9 @@ if model_name == "vgg16":
     model.summary()
     image_size = (224, 224)
 elif model_name == "inceptionv3":
-    base_model = InceptionV3(include_top=include_top, weights=weights, input_tensor=Input(shape=(299,299,3)), pooling="avg")
-    base_model.summary()
-    x = Dense(num_classes, activation="softmax")(base_model.get_layer('avg_pool').output)
+    base_model = InceptionV3(include_top=include_top, weights=weights, input_tensor=Input(shape=(299,299,3)))
+    x = Flatten()(base_model.layers[-2].output)
     model = Model(input=base_model.input, output=x)
-    model.summary()
     image_size = (299, 299)
 elif model_name == "inceptionresnetv2":
     base_model = InceptionResNetV2(include_top=include_top, weights=weights, input_tensor=Input(shape=(299,299,3)))
@@ -70,7 +68,6 @@ elif model_name == "inceptionresnetv2":
     image_size = (299, 299)
 elif model_name == 'densenet':
     base_model = DenseNet121(include_top=include_top, weights=weights, input_tensor=Input(shape=(224,224,3)), input_shape=(224,224,3), pooling='avg')
-    base_model.summary()
     x = Dense(num_classes, activation='softmax')(base_model.get_layer('avg_pool').output)
     model = Model(input=base_model.input, output=x)
     model.summary()
@@ -103,9 +100,7 @@ for i, label in enumerate(train_labels):
         x = np.expand_dims(x, axis=0)
         x = preprocess_input(x)
         feature = model.predict(x)
-        print(feature.shape)
         flat = feature.flatten()
-        print(flat.shape)
         features.append(flat)
         labels.append(label)
         # print ("[INFO] processed - " + str(count))

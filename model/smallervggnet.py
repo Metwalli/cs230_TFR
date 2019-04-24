@@ -52,3 +52,4 @@ class SmallerVGGNet:
 
 
 		return logits
+

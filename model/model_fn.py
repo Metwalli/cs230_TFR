@@ -1,7 +1,7 @@
 """Define the model."""
 
 import tensorflow as tf
-from .densenet_model import DenseNetBase, DenseNetUpdated, DenseNetInception
+from .densenet_model import DenseNet121, DenseNetInception
 from .smallervggnet import SmallerVGGNet
 from .densenet_keras_model import densenet121_model
 
@@ -74,9 +74,7 @@ def model_fn(mode, inputs, params, reuse=False):
         # Compute the output distribution of the model and the predictions
         if params.model == 'base':
             # logits = densenet121_model(img_rows=224, img_cols=224, color_type=3, num_classes=5)
-            logits = DenseNetBase(x=inputs, params=params, reuse=reuse, is_training=is_training).model
-        elif params.model == "updated":
-            logits = DenseNetUpdated(x=inputs, params=params, reuse=reuse, is_training=is_training).model
+            logits = DenseNet121(x=inputs, params=params, reuse=reuse, is_training=is_training).model
         elif params.model == "inception":
             logits = DenseNetInception(x=inputs, params=params, reuse=reuse, is_training=is_training).model
         elif params.model == "vgg":

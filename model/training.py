@@ -3,6 +3,7 @@
 import logging
 import os
 
+import tensorflow.contrib.slim as slim
 from tqdm import trange
 import tensorflow as tf
 
@@ -54,6 +55,11 @@ def train_sess(sess, model_spec, num_steps, writer, params):
     logging.info("- Train metrics: " + metrics_string)
 
 
+def model_summary():
+    model_vars = tf.trainable_variables()
+    slim.model_analyzer.analyze_vars(model_vars, print_info=True)
+
+
 def train_and_evaluate(train_model_spec, eval_model_spec, model_dir, params, restore_from=None):
     """Train the model and evaluate every epoch.
 
@@ -69,6 +75,7 @@ def train_and_evaluate(train_model_spec, eval_model_spec, model_dir, params, res
     last_saver = tf.train.Saver() # will keep last 5 epochs
     best_saver = tf.train.Saver(max_to_keep=1)  # only keep 1 best checkpoint (best on eval)
     begin_at_epoch = 0
+    model_summary()
 
     with tf.Session() as sess:
         # Initialize model variables

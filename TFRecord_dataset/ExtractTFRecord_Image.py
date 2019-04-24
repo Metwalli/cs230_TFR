@@ -64,7 +64,8 @@ class TFRecordExtractor:
                     # save_path = os.path.abspath(os.path.join(folder_path, file_name))
                     # mpimg.imsave(save_path, image_data[0])
                     i += 1
-                    print(file_name)
+                    if image_data[1]> 2:
+                        print(file_name)
 
             except:
                 pass
@@ -72,5 +73,5 @@ class TFRecordExtractor:
 
 
 if __name__ == '__main__':
-    t = TFRecordExtractor('C:\data\VIREO\\172_67_33\\train\\train.tfrecord')
+    t = TFRecordExtractor('c:users\Metwalli\\food224\\tst.tfrecord')
     t.extract_image()

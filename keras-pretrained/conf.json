@@ -3,8 +3,8 @@
   "weights"         : "imagenet",
   "include_top"     : false,
 
-  "train_path"      : "C:\\data\\17flowers/train",
-  "test_path"       : "C:\\data\\17flowers/test",
+  "train_path"      : "/home/ai309/metwalli/train",
+  "test_path"       : "/home/ai309/metwalli/test",
   "features_path"   : "output/flowers_17/inceptionv3/features.h5",
   "labels_path"     : "output/flowers_17/inceptionv3/labels.h5",
   "results"         : "output/flowers_17/inceptionv3/results.txt",

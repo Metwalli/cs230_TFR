@@ -4,7 +4,7 @@ from __future__ import print_function
 from keras.models import Model
 from keras.applications.inception_v3 import InceptionV3, preprocess_input
 from keras.applications.densenet import DenseNet121
-from keras.layers import Flatten, Input
+from keras.layers import Flatten, Input, Dense
 from sklearn.metrics import classification_report
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
@@ -64,10 +64,14 @@ print ("[INFO] test labels : {}".format(testLabels.shape))
 
 # use logistic regression as the model
 print ("[INFO] creating model...")
-base_model = InceptionV3(include_top=False, weights=None, input_tensor=Input(shape=(299,299,3)), pooling='avg')
-x = Flatten()(base_model.layers[-2].output)
+base_model = DenseNet121(include_top=False, weights='imagenet', input_tensor=Input(shape=(224,224,3)), input_shape=(224,224,3), pooling='avg')
+x = Dense(172, activation='softmax')(base_model.get_layer('avg_pool').output)
 model = Model(input=base_model.input, output=x)
-model = LogisticRegression(random_state=seed)
+model.summary()
+# base_model = InceptionV3(include_top=False, weights=None, input_tensor=Input(shape=(299,299,3)), pooling='avg')
+# x = Flatten()(base_model.layers[-2].output)
+# model = Model(input=base_model.input, output=x)
+# model = LogisticRegression(random_state=seed)
 model.fit(trainData, trainLabels)
 
 # use rank-1 and rank-5 predictions

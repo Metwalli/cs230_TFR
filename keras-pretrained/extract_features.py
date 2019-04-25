@@ -10,7 +10,7 @@ from keras.applications.densenet import DenseNet121
 from keras.preprocessing import image
 from keras.models import Model
 from keras.models import model_from_json
-from keras.layers import Input, Dense, Flatten
+from keras.layers import Input, Dense, Flatten, Dropout
 
 # other imports
 from sklearn.preprocessing import LabelEncoder
@@ -65,8 +65,9 @@ elif model_name == 'densenet':
     base_model = DenseNet121(include_top=include_top, weights=weights, input_tensor=Input(shape=(224,224,3)), input_shape=(224,224,3))
     # x = Dense(num_classes, activation='softmax')(base_model.get_layer('avg_pool').output)
     x = Flatten()(base_model.layers[-1].output)
+    x = Dense(4096, name="output_layer")(x)
     model = Model(input=base_model.input, output=x)
-    model.summary()
+    # model.summary()
     image_size = (224, 224)
 else:
     base_model = None

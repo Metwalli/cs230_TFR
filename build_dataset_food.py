@@ -26,7 +26,7 @@ from tqdm import tqdm
 import numpy as np
 
 
-SIZE = 299
+SIZE = 224
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--data_dir', default='C:\data\\food_05_300x300', help="Directory with the SIGNS dataset")

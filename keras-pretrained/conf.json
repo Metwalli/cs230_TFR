@@ -1,5 +1,5 @@
 {
-  "model"           : "inceptionv3",
+  "model"           : "densenet",
   "weights"         : "imagenet",
   "include_top"     : false,
 

@@ -4,11 +4,7 @@ warnings.simplefilter(action="ignore", category=FutureWarning)
 
 # keras imports
 from keras.applications.vgg16 import VGG16, preprocess_input
-from keras.applications.vgg19 import VGG19, preprocess_input
-from keras.applications.xception import Xception, preprocess_input
-from keras.applications.resnet50 import ResNet50, preprocess_input
 from keras.applications.inception_resnet_v2 import InceptionResNetV2, preprocess_input
-from keras.applications.mobilenet import MobileNet, preprocess_input
 from keras.applications.inception_v3 import InceptionV3, preprocess_input
 from keras.applications.densenet import DenseNet121
 from keras.preprocessing import image
@@ -57,9 +53,8 @@ if model_name == "vgg16":
     model.summary()
     image_size = (224, 224)
 elif model_name == "inceptionv3":
-    base_model = InceptionV3(include_top=include_top, weights=weights, input_tensor=Input(shape=(299,299,3)))
-    x = Flatten()(base_model.layers[-2].output)
-    model = Model(input=base_model.input, output=x)
+    base_model = InceptionV3(include_top=include_top, weights=weights, input_tensor=Input(shape=(299,299,3)), pooling='avg')
+    model = Model(input=base_model.input, output=base_model.layers[-1].output)
     image_size = (299, 299)
 elif model_name == "inceptionresnetv2":
     base_model = InceptionResNetV2(include_top=include_top, weights=weights, input_tensor=Input(shape=(299,299,3)))
@@ -67,8 +62,9 @@ elif model_name == "inceptionresnetv2":
     model = Model(input=base_model.input, output=base_model.get_layer('custom').output)
     image_size = (299, 299)
 elif model_name == 'densenet':
-    base_model = DenseNet121(include_top=include_top, weights=weights, input_tensor=Input(shape=(224,224,3)), input_shape=(224,224,3), pooling='avg')
-    x = Dense(num_classes, activation='softmax')(base_model.get_layer('avg_pool').output)
+    base_model = DenseNet121(include_top=include_top, weights=weights, input_tensor=Input(shape=(224,224,3)), input_shape=(224,224,3))
+    # x = Dense(num_classes, activation='softmax')(base_model.get_layer('avg_pool').output)
+    x = Flatten()(base_model.layers[-1].output)
     model = Model(input=base_model.input, output=x)
     model.summary()
     image_size = (224, 224)

@@ -1,6 +1,10 @@
 # organize imports
 from __future__ import print_function
 
+from keras.models import Model
+from keras.applications.inception_v3 import InceptionV3, preprocess_input
+from keras.applications.densenet import DenseNet121
+from keras.layers import Flatten, Input
 from sklearn.metrics import classification_report
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
@@ -60,6 +64,9 @@ print ("[INFO] test labels : {}".format(testLabels.shape))
 
 # use logistic regression as the model
 print ("[INFO] creating model...")
+base_model = InceptionV3(include_top=False, weights=None, input_tensor=Input(shape=(299,299,3)), pooling='avg')
+x = Flatten()(base_model.layers[-2].output)
+model = Model(input=base_model.input, output=x)
 model = LogisticRegression(random_state=seed)
 model.fit(trainData, trainLabels)
 

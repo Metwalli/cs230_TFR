@@ -2,6 +2,7 @@
 from __future__ import print_function
 
 from keras.models import Model
+from keras.optimizers import Adam
 from keras.applications.inception_v3 import InceptionV3, preprocess_input
 from keras.applications.densenet import DenseNet121
 from keras.layers import Flatten, Input, Dense
@@ -67,6 +68,10 @@ print ("[INFO] creating model...")
 base_model = DenseNet121(include_top=False, weights='imagenet', input_tensor=Input(shape=(224,224,3)), input_shape=(224,224,3), pooling='avg')
 x = Dense(172, activation='softmax')(base_model.get_layer('avg_pool').output)
 model = Model(input=base_model.input, output=x)
+opt = Adam(lr=0.01, decay=0.01 / 10)
+model.compile(loss="sparse_categorical_crossentropy", optimizer=opt,
+              metrics=["accuracy"])
+
 model.summary()
 # base_model = InceptionV3(include_top=False, weights=None, input_tensor=Input(shape=(299,299,3)), pooling='avg')
 # x = Flatten()(base_model.layers[-2].output)

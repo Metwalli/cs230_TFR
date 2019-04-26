@@ -12,13 +12,13 @@ datagen = ImageDataGenerator(
         height_shift_range=0.3,
         shear_range=0.3,
         zoom_range=0.3,
-        horizontal_flip=True,
+        # horizontal_flip=True,
         fill_mode='nearest')
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--data_dir',
                     help="Data Directory")
-parser.add_argument('--no_aug',
+parser.add_argument('--num_aug',
                     help="Number of Augmentations"),
 
 args = parser.parse_args()

@@ -71,30 +71,6 @@ def get_images_data(data_dir, opt):
             imagesPaths.append(os.path.join(data_dir, opt, d + ".jpg"))
     return imagesPaths, labels
 
-def create_meta_data(source_data_dir, dist_data_dir):
-    class_to_ix, ix_to_class = class_to_index_mapping(source_data_dir)
-    classes_file = open(os.path.join(dist_data_dir, "meta/classes.txt"), "w")
-    if not os.path.exists(dist_data_dir):
-        os.mkdir(dist_data_dir)
-        os.mkdir(os.path.join(dist_data_dir, "meta"))
-    train_file = open(os.path.join(dist_data_dir, "meta/train.txt"), "w")
-    with open(os.path.join(source_data_dir, "meta/train.txt"))as t:
-        train_pahts = t.read().splitlines()
-        for i in range(len(ix_to_class)):
-            classes_file.write(ix_to_class[i]+"\n")
-            for p in train_pahts:
-                class_name = p.split('/')[0]
-                if ix_to_class[i] == class_name:
-                    train_file.write(p+"\n")
-    test_file = open(os.path.join(dist_data_dir, "meta/test.txt"), "w")
-    with open(os.path.join(source_data_dir, "meta/test.txt"))as t:
-        test_pahts = t.read().splitlines()
-        for i in range(len(ix_to_class)):
-            for p in test_pahts:
-                class_name = p.split('/')[0]
-                if ix_to_class[i] == class_name:
-                    test_file.write(p+"\n")
-
 def resize_and_save(filename, output_dir, size=SIZE):
     """Resize the image contained in `filename` and save it to the `output_dir`"""
     image = Image.open(filename)

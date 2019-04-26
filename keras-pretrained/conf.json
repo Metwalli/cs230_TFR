@@ -3,15 +3,14 @@
   "weights"         : "imagenet",
   "include_top"     : false,
 
-  "train_path"      : "/home/ai309/metwalli/data/food_10_300x300/all-train",
-  "test_path"       : "/home/ai309/metwalli/data/food_10_300x300/all-train",
-  "features_path"   : "output/flowers_17/inceptionv3/features.h5",
-  "labels_path"     : "output/flowers_17/inceptionv3/labels.h5",
-  "results"         : "output/flowers_17/inceptionv3/results.txt",
-  "classifier_path" : "output/flowers_17/inceptionv3/classifier.pickle",
-  "model_path"      : "output/flowers_17/inceptionv3/model",
+  "epochs"          : 10,
+  "learning_rate"   : 1e-2,
+  "batch_size"      : 1,
+  "results"         : "output/densenet/results.txt",
+  "model_path"      : "output/densenet/model",
+  "classifier_path" : "output/densenet/classifier",
 
-  "test_size"       : 0.10,
+  "test_size"       : 0.30,
   "seed"            : 9,
-  "num_classes"     : 17
+  "num_classes"     : 172
 }

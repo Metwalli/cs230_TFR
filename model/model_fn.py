@@ -1,7 +1,7 @@
 """Define the model."""
 
 import tensorflow as tf
-from .densenet_model import DenseNet121, DenseNetInceptionv1
+from .densenet_model import DenseNet121, DenseNetInceptionv1, DenseNetInceptionv2
 from .smallervggnet import SmallerVGGNet
 from .densenet_keras_model import densenet121_model
 
@@ -75,8 +75,10 @@ def model_fn(mode, inputs, params, reuse=False):
         if params.model == 'base':
             # logits = densenet121_model(img_rows=224, img_cols=224, color_type=3, num_classes=5)
             logits = DenseNet121(x=inputs, params=params, reuse=reuse, is_training=is_training).model
-        elif params.model == "inception":
+        elif params.model == "inceptionv1":
             logits = DenseNetInceptionv1(x=inputs, params=params, reuse=reuse, is_training=is_training).model
+        elif params.model == "inceptionv2":
+            logits = DenseNetInceptionv2(x=inputs, params=params, reuse=reuse, is_training=is_training).model
         elif params.model == "vgg":
             logits = SmallerVGGNet.build(is_training, inputs, params)
         else:

@@ -90,7 +90,6 @@ validation_generator = test_datagen.flow_from_directory(
 
 # initialize the model
 CLASSES = train_generator.num_classes
-print(CLASSES)
 
 print ("[INFO] creating model...")
 if restore_from is not None:
@@ -98,12 +97,11 @@ if restore_from is not None:
 else:
     use_imagenet_weights = True
 
-model = DenseNetInceptionConcat(num_labels=CLASSES, use_imagenet_weights=True).model
+model = DenseNetInceptionConcat(num_labels=CLASSES, use_imagenet_weights=use_imagenet_weights).model
 model.summary()
-
 print("[INFO] compiling model...")
-opt = Adam(lr=0.01, decay=0.01 / 10)
-model.compile(loss="sparse_categorical_crossentropy", optimizer=opt,
+opt = Adam(lr=INIT_LR, decay=INIT_LR / EPOCHS)
+model.compile(loss="categorical_crossentropy", optimizer=opt,
               metrics=["accuracy"])
 
 print ("[INFO] training started...")
@@ -124,6 +122,7 @@ M = model.fit_generator(
         validation_data=validation_generator,
         validation_steps=validation_generator.n // validation_generator.batch_size,
         callbacks=[callbacks_list, tensorBoard])
+
 
 """
 model.evaluate_generator(generator=validation_generator)

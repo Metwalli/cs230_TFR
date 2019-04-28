@@ -85,13 +85,12 @@ class DenseNetInceptionConcat():
 
         block4_output = base_model.get_layer('relu').output
         concat = Concatenate(name="incepC_output_block4_output")([incep_c, block4_output])
-        """
+        
         out = Global_Average_Pooling(base_model.get_layer('relu').output)
-
+        """
         with tf.variable_scope('fc_2'):
-            logits = Dense(self.num_labels)(out)
-
-        model = Model(inputs=base_model.input, outputs=logits)
+            classifier = Dense(self.num_labels, activation='softmax')(base_model.get_layer('avg_pool').output)
+        model = Model(inputs=base_model.input, outputs=classifier)
 
         return model
 

@@ -23,7 +23,7 @@ parser.add_argument('--num_aug',
 
 args = parser.parse_args()
 data_dir = args.data_dir
-no_aug = int(args.no_aug)
+no_aug = int(args.num_aug)
 
 def img_augmentation(img, output_dir, filename):
     x = img_to_array(img)  # convert image to numpy array

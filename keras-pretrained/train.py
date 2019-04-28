@@ -20,16 +20,18 @@ from keras.callbacks import ModelCheckpoint
 import time
 import os
 import json
+
+from dense_inception import DenseNetInception
+from dense_inception_concat import DenseNetInceptionConcat
+from utils import Params
 import pickle
 import seaborn as sns
 import matplotlib.pyplot as plt
 
 
 ap = argparse.ArgumentParser()
-ap.add_argument("-d", "--data_dir", required=True,
+ap.add_argument("-d", "--data_dir", required=False,
                 help="path to input dataset (i.e., directory of images)")
-ap.add_argument("-c", "--ckpt_dir", required=True,
-                help="path of check points (i.e., directory of check points)")
 ap.add_argument("-r", "--restore_from", required=False,
                 help="path of saved checkpoints (i.e., directory of check points)")
 ap.add_argument("-p", "--plot", type=str, default="plot.png",
@@ -43,25 +45,30 @@ args = vars(ap.parse_args())
 # Arguments
 data_dir = args["data_dir"]
 restore_from = args["restore_from"]
-ckpt_dir = args["ckpt_dir"]
 
 
 # load the user configs
-with open('conf.json') as f:
-  config = json.load(f)
+
+params = Params('params.json')
 
 # config variables
-EPOCHS = config["epochs"]
-INIT_LR = config["learning_rate"]
-BS = config["batch_size"]
-IMAGE_DIMS = (224, 224, 3)
-seed      = config["seed"]
-results     = config["results"]
-classifier_path = config["classifier_path"]
+EPOCHS = params.num_epochs
+INIT_LR = params.learning_rate
+BS = params.batch_size
+IMAGE_DIMS = (params.image_size, params.image_size, 3)
+seed      = 2019
+results     = params.results_path
+classifier_path = params.classifier_path
+model_path = params.model_path
 
 
+if data_dir is None:
+    data_dir = params.data_dir
+
+# Dataset Directory
 train_dir = os.path.join(data_dir, "train")
 valid_dir = os.path.join(data_dir, "test")
+
 train_datagen = ImageDataGenerator(rotation_range=25,
                                    width_shift_range=0.1,
                                    rescale=1./255,
@@ -80,17 +87,18 @@ validation_generator = test_datagen.flow_from_directory(
         target_size=(IMAGE_DIMS[1], IMAGE_DIMS[1]),
         batch_size=BS,
         class_mode='binary')
+
 # initialize the model
 CLASSES = train_generator.num_classes
 print(CLASSES)
 
-# verify the shape of features and labels
-
-
 print ("[INFO] creating model...")
-base_model = DenseNet121(include_top=False, weights='imagenet', input_tensor=Input(shape=(224,224,3)), input_shape=(224,224,3), pooling='avg')
-x = Dense(CLASSES, activation='softmax')(base_model.get_layer('avg_pool').output)
-model = Model(input=base_model.input, output=x)
+if restore_from is not None:
+    use_imagenet_weights = False
+else:
+    use_imagenet_weights = True
+
+model = DenseNetInceptionConcat(num_labels=CLASSES, use_imagenet_weights=True).model
 model.summary()
 
 print("[INFO] compiling model...")
@@ -103,7 +111,7 @@ print ("[INFO] training started...")
 tensorBoard = TensorBoard(log_dir='logs/{}'.format(time.time()))
 # checkpoint
 
-checkpoint = ModelCheckpoint(ckpt_dir, monitor='val_acc', verbose=1, save_best_only=True, mode='max')
+checkpoint = ModelCheckpoint("output/ckpts_dir", monitor='val_acc', period=5, verbose=1, save_best_only=True, mode='max')
 callbacks_list = checkpoint
 if restore_from is not None:
     if os.path.isdir(restore_from):
@@ -117,6 +125,7 @@ model.fit_generator(
         validation_steps=validation_generator.n // validation_generator.batch_size,
         callbacks=[callbacks_list, tensorBoard])
 
+"""
 model.evaluate_generator(generator=validation_generator)
 validation_generator.reset()
 pred=model.predict_generator(validation_generator, verbose=1)
@@ -130,7 +139,7 @@ filenames=validation_generator.filenames
 results=pd.DataFrame({"Filename":filenames,
                       "Predictions":predictions})
 results.to_csv(os.path.join(results, "results.csv"),index=False)
-
+"""
 """
 # use rank-1 and rank-5 predictions
 print ("[INFO] evaluating model...")

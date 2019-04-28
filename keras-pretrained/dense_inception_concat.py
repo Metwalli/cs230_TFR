@@ -5,6 +5,7 @@ from keras.layers import Conv2D, Dense, Flatten, Input, BatchNormalization, \
 from keras.models import Model
 from keras.backend import image_data_format
 from keras.applications.densenet import DenseNet121
+from keras.utils import plot_model
 
 bn_axis = 3 if image_data_format() == 'channels_last' else 1
 eps = 1.001e-5
@@ -53,63 +54,46 @@ def batch_normalization_fn(x, name=None):
 def dropout_fn(x, rate):
     return Dropout(rate=rate)(x)
 
+def load_densenet_model(use_weights):
+    weights = 'imagenet' if use_weights == True else None
+    base_model = DenseNet121(include_top=False, weights=weights, input_tensor=Input(shape=(224, 224, 3)),
+                             input_shape=(224, 224, 3), pooling='avg')
+    return base_model
 
-class DenseNetInception():
-    def __init__(self, input_shape, params):
-        self.dropout_rate = params.dropout_rate
-        self.compression_rate = params.compression_rate,
-        self.num_layers_per_block = params.num_layers_per_block
-        self.growth_rate = params.growth_rate
-        self.num_filters = params.num_filters
-        self.num_labels = params.num_labels
+class DenseNetInceptionConcat():
+    def __init__(self, num_labels, use_imagenet_weights=True):
 
-        self.model = self.Dense_net(input_shape)
+        self.num_labels = num_labels
+        self.use_imagenet_weights = use_imagenet_weights
 
-    def Dense_net(self, input_shape):
-        input_layer = Input(shape=input_shape)
+        self.model = self.Dense_net()
 
-        out = input_layer
-        with tf.variable_scope('DenseNet-v'):
-            out = conv_layer(out, num_filters=self.num_filters, kernel=[7, 7], stride=2, layer_name='conv0')
-            out = batch_normalization_fn(out)
-            out = activation_fn(out)
-            out = Max_Pooling(out, pool_size=[3, 3], stride=2)
-            # define list contain the number layers in blocks the length of list based on the number blocks in the model
+    def Dense_net(self):
 
-            out = self.dense_block(input_x=out, nb_layers=self.num_layers_per_block[0], layer_name='dense_1')
-            # tf.summary.histogram("weights", w)
+        base_model = load_densenet_model(self.use_imagenet_weights)
 
-            out = self.inception_module_A(out, scope='inceptA_')
-            if self.dropout_rate > 0:
-                out = dropout_fn(out, rate=self.dropout_rate)
-            #             self.num_filters = self.num_filters * self.compression_rate
+        block1_output = base_model.get_layer('pool2_relu').output
+        incep_a = self.inception_module_A(block1_output, "incepA_")
 
-            out = self.dense_block(input_x=out, nb_layers=self.num_layers_per_block[1], layer_name='dense_2')
-            out = self.inception_module_B(out, scope='inceptB_')
-            if self.dropout_rate > 0:
-                out = dropout_fn(out, rate=self.dropout_rate)
-            #             self.num_filters = self.num_filters * self.compression_rate
+        block2_output = base_model.get_layer('pool3_relu').output
+        concat = Concatenate(name="incepA_output_block2_output")([incep_a, block2_output])
+        incep_b = self.inception_module_B(concat, "incepB_")
 
-            out = self.dense_block(input_x=out, nb_layers=self.num_layers_per_block[2], layer_name='dense_3')
-            out = self.inception_module_C(out, scope='inceptC_')
-            if self.dropout_rate > 0:
-                out = dropout_fn(out, rate=self.dropout_rate)
+        block3_output = base_model.get_layer('pool4_relu').output
+        concat = Concatenate(name="incepB_output_block3_output")([incep_b, block3_output])
+        incep_c = self.inception_module_C(concat, "incepC_")
 
-            out = batch_normalization_fn(out)
-            out = activation_fn(out)
-            out = Global_Average_Pooling(out)
+        block4_output = base_model.get_layer('relu').output
+        concat = Concatenate(name="incepC_output_block4_output")([incep_c, block4_output])
+        out = Global_Average_Pooling(concat)
 
-            with tf.variable_scope('fc_2'):
-                logits = Dense(self.num_labels)(out)
+        with tf.variable_scope('fc_2'):
+            logits = Dense(self.num_labels)(out)
 
-            model = Model(input=input_layer, output=logits)
+        model = Model(inputs=base_model.input, outputs=logits)
 
         return model
 
-    def load_densenet_model(self):
-        base_model = DenseNet121(include_top=False, weights='imagenet', input_tensor=Input(shape=(224, 224, 3)),
-                                 input_shape=(224, 224, 3), pooling='avg')
-        return base_model
 
     def inception_module_A(self, x, scope):
         with tf.name_scope(scope):
@@ -178,57 +162,6 @@ class DenseNetInception():
             concat = activation_fn(concat)
 
             x3 = conv_layer(concat, 1792, kernel=[1, 1], layer_name=scope + "convX3")
+            out = Average_pooling(x3, pool_size=[2, 2], stride=2, name=scope)
 
-            return x3
-
-    def bottleneck_layer(self, x, no_filters, scope):
-        with tf.name_scope(scope):
-            x = batch_normalization_fn(x)
-            x = activation_fn(x)
-            num_channels = no_filters * 4
-            x = conv_layer(x, num_filters=num_channels, kernel=[1, 1], layer_name=scope + '_conv1')
-            if self.dropout_rate > 0:
-                x = dropout_fn(x, rate=self.dropout_rate)
-            x = batch_normalization_fn(x)
-            x = activation_fn(x)
-            x = conv_layer(x, num_filters=no_filters, kernel=[3, 3], layer_name=scope + '_conv2')
-            if self.dropout_rate > 0:
-                x = dropout_fn(x, rate=self.dropout_rate)
-
-            return x
-
-    def dense_block(self, input_x, nb_layers, layer_name):
-        with tf.name_scope(layer_name):
-            concat_feat = input_x
-            for i in range(nb_layers):
-                x = self.bottleneck_layer(concat_feat, no_filters=self.growth_rate,
-                                          scope=layer_name + '_bottleN_' + str(i + 1))
-                concat_feat = Concatenate(axis=3)([concat_feat, x])
-
-            #                 self.num_filters += self.growth_rate
-
-            return concat_feat
-
-    """
-    def Dense_net(self):
-
-        base_model = self.load_densenet_model()
-        base_block1_output = base_model.get_layer('conv2_block6_concat').output
-        base_block2_output = base_model.get_layer('conv4_block24_concat').output
-        base_block2_output = base_model.get_layer('conv5_block16_concat').output
-
-        input_layer = Input(shape=(56, 56, 3))
-        ince_A_ouptut = self.inception_module_A(input_layer, scope="IncepA")
-        concat = concatenate(ince_A_ouptut, base_model.get_layer('conv3_block12_concat').output)
-        ince_B_ouptut = self.inception_module_B(concat, scope="IncepB")
-        concat = concatenate(ince_B_ouptut, )
-        ince_C_ouptut = self.inception_module_C(concat, scope="IncepC")
-        concat = concatenate(ince_C_ouptut, )
-        out = batch_normalization_fn(concat, name="concat_bn")
-        out = activation_fn(out, name="out_bn")
-        out = GlobalAveragePooling2D(name='avg_pool')(out)
-        out = Dense(num_classes, activation="softmax", name="classification_layer")(out)
-        return Model(input=base_model.input, output=out)
-        
-    """
-
+            return out

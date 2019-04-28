@@ -71,7 +71,7 @@ class DenseNetInceptionConcat():
     def Dense_net(self):
 
         base_model = load_densenet_model(self.use_imagenet_weights)
-
+        """
         block1_output = base_model.get_layer('pool2_relu').output
         incep_a = self.inception_module_A(block1_output, "incepA_")
 
@@ -86,9 +86,10 @@ class DenseNetInceptionConcat():
         block4_output = base_model.get_layer('relu').output
         concat = Concatenate(name="incepC_output_block4_output")([incep_c, block4_output])
         out = Global_Average_Pooling(concat)
-
+        """
         with tf.variable_scope('fc_2'):
-            logits = Dense(self.num_labels)(out)
+            f = Flatten()(base_model.get_layer('relu').output)
+            logits = Dense(self.num_labels)(f)
 
         model = Model(inputs=base_model.input, outputs=logits)
 

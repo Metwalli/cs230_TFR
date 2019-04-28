@@ -19,7 +19,7 @@
     "num_parallel_calls": 4,
     "save_summary_steps": 10,
 
-    "data_dir": "data",
+    "data_dir": "/home/ai309/metwalli/data/VIREO/172",
     "model": "inception",
     "results_path": "output/results.txt",
     "model_path"      : "output/model",

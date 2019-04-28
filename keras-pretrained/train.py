@@ -80,13 +80,13 @@ test_datagen = ImageDataGenerator(rescale=1./255)
 train_generator = train_datagen.flow_from_directory(
         train_dir,
         target_size=(IMAGE_DIMS[1], IMAGE_DIMS[1]),
-        class_mode='binary')
+        class_mode="categorical")
 
 validation_generator = test_datagen.flow_from_directory(
         valid_dir,
         target_size=(IMAGE_DIMS[1], IMAGE_DIMS[1]),
         batch_size=BS,
-        class_mode='binary')
+        class_mode="categorical")
 
 # initialize the model
 CLASSES = train_generator.num_classes
@@ -117,7 +117,7 @@ if restore_from is not None:
     if os.path.isdir(restore_from):
         model.load_weights(restore_from)
 
-model.fit_generator(
+M = model.fit_generator(
         train_generator,
         steps_per_epoch=train_generator.n // train_generator.batch_size,
         epochs=EPOCHS,

@@ -1,12 +1,12 @@
 # organize imports
 from __future__ import print_function
 
-import pandas as pd
-from keras.models import Model
+# import pandas as pd
+# from keras.models import Model
 from keras.optimizers import Adam
 # from keras.applications.inception_v3 import InceptionV3, preprocess_input
-from keras.applications.densenet import DenseNet121
-from keras.layers import Flatten, Input, Dense
+# from keras.applications.densenet import DenseNet121
+# from keras.layers import Flatten, Input, Dense
 # from sklearn.metrics import classification_report
 # from sklearn.model_selection import train_test_split
 # from sklearn.linear_model import LogisticRegression
@@ -125,7 +125,7 @@ M = model.fit_generator(
         epochs=EPOCHS,
         validation_data=validation_generator,
         validation_steps=validation_generator.n // validation_generator.batch_size,
-        callbacks=[tensorBoard])
+        callbacks=[callbacks_list, tensorBoard])
 
 
 # save the model to disk

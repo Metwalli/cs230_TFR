@@ -1,8 +1,7 @@
 # organize imports
 from __future__ import print_function
 
-# import pandas as pd
-# from keras.models import Model
+import pandas as pd
 from keras.optimizers import Adam
 # from keras.applications.inception_v3 import InceptionV3, preprocess_input
 # from keras.applications.densenet import DenseNet121
@@ -11,8 +10,9 @@ from keras.optimizers import Adam
 # from sklearn.model_selection import train_test_split
 # from sklearn.linear_model import LogisticRegression
 # from sklearn.metrics import confusion_matrix
-# import numpy as np
+import numpy as np
 # import h5py
+import matplotlib.pyplot as plt
 import argparse
 from keras.preprocessing.image import ImageDataGenerator
 from tensorflow.python.keras.callbacks import TensorBoard
@@ -126,7 +126,7 @@ file_path = os.path.join(model_dir, "checkpoints", "best.weights.hdf5")
 checkpoint = ModelCheckpoint(file_path, monitor='val_acc', period=save_period_step, verbose=1, save_best_only=True, mode='max')
 callbacks_list = checkpoint
 
-M = model.fit_generator(
+history = model.fit_generator(
         train_generator,
         steps_per_epoch=train_generator.n // train_generator.batch_size,
         epochs=EPOCHS,
@@ -138,3 +138,27 @@ M = model.fit_generator(
 # save the model to disk
 print("[INFO] serializing network...")
 model.save(os.path.join(model_dir,  "checkpoints", "last.weights.h5"))
+
+# plot the training loss and accuracy
+plt.style.use("ggplot")
+plt.figure()
+N = EPOCHS
+plt.plot(np.arange(0, N), history.history["loss"], label="train_loss")
+plt.plot(np.arange(0, N), history.history["val_loss"], label="val_loss")
+plt.title("Training Loss")
+plt.xlabel("Epoch #")
+plt.ylabel("Loss")
+plt.legend(loc="upper left")
+plt.savefig(os.path.join(model_dir, "loss_plot.png"))
+
+plt.plot(np.arange(0, N), history.history["acc"], label="train_acc")
+plt.plot(np.arange(0, N), history.history["val_acc"], label="val_acc")
+plt.title("Training Accuracy")
+plt.xlabel("Epoch #")
+plt.ylabel("Accuracy")
+plt.legend(loc="upper left")
+plt.savefig(os.path.join(model_dir, "accuracy_plot.png"))
+
+results = open(os.path.join(model_dir, "results.txt"), "w")
+results.write(history.history)
+results.close()

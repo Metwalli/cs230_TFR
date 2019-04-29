@@ -1,7 +1,7 @@
 # organize imports
 from __future__ import print_function
 
-# import pandas as pd
+import pandas as pd
 from keras.models import Model
 from keras.optimizers import Adam
 # from keras.applications.inception_v3 import InceptionV3, preprocess_input

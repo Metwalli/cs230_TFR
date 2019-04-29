@@ -102,7 +102,6 @@ elif model_name == 'inject':
     model = DenseNetInceptionConcat(num_labels=CLASSES, use_imagenet_weights=use_imagenet_weights).model
 else:
     model = DenseNetInception(input_shape= IMAGE_DIMS, params=params).model
-model.summary()
 
 if restore_from is not None:
     model.load_weights(os.path.join(model_dir, restore_from))
@@ -126,7 +125,7 @@ M = model.fit_generator(
         epochs=EPOCHS,
         validation_data=validation_generator,
         validation_steps=validation_generator.n // validation_generator.batch_size,
-        callbacks=[callbacks_list, tensorBoard])
+        callbacks=[tensorBoard])
 
 
 # save the model to disk

@@ -64,10 +64,14 @@ classifier_path = params.classifier_path
 model_path = params.model_path
 model_name = params.model_name
 use_imagenet_weights = params.use_imagenet_weights
+save_period_step = params.save_period_step
 
 
 if data_dir is None:
     data_dir = params.data_dir
+
+if restore_from is not None:
+    use_imagenet_weights = False
 
 # Dataset Directory
 train_dir = os.path.join(data_dir, "train")
@@ -91,12 +95,12 @@ validation_generator = test_datagen.flow_from_directory(
         target_size=(IMAGE_DIMS[1], IMAGE_DIMS[1]),
         batch_size=BS,
         class_mode='categorical')
-# initialize the model
+
 CLASSES = train_generator.num_classes
+params.num_labels = CLASSES
 
+# initialize the model
 print ("[INFO] creating model...")
-
-
 if model_name == 'base':
     model = DenseNetBaseModel(CLASSES, use_imagenet_weights).model
 elif model_name == 'inject':
@@ -104,8 +108,9 @@ elif model_name == 'inject':
 else:
     model = DenseNetInception(input_shape=IMAGE_DIMS, params=params).model
 
-file_path = os.path.join(restore_from, "best.weights.hdf5")
+# Restore Model
 if restore_from is not None:
+    file_path = os.path.join(restore_from, "best.weights.hdf5")
     model.load_weights(file_path)
 
 print("[INFO] compiling model...")
@@ -118,7 +123,7 @@ print ("[INFO] training started...")
 tensorBoard = TensorBoard(log_dir=os.path.join(model_dir, 'logs/{}'.format(time.time())))
 # checkpoint
 file_path = os.path.join(model_dir, "checkpoints", "best.weights.hdf5")
-checkpoint = ModelCheckpoint(file_path, monitor='val_acc', period=5, verbose=1, save_best_only=True, mode='max')
+checkpoint = ModelCheckpoint(file_path, monitor='val_acc', period=save_period_step, verbose=1, save_best_only=True, mode='max')
 callbacks_list = checkpoint
 
 M = model.fit_generator(

@@ -97,11 +97,11 @@ print ("[INFO] creating model...")
 
 
 if model_name == 'base':
-    model = DenseNetBaseModel(CLASSES, use_imagenet_weights)
+    model = DenseNetBaseModel(CLASSES, use_imagenet_weights).model
 elif model_name == 'inject':
     model = DenseNetInceptionConcat(num_labels=CLASSES, use_imagenet_weights=use_imagenet_weights).model
 else:
-    model = DenseNetInception(input_shape= IMAGE_DIMS, params=params)
+    model = DenseNetInception(input_shape= IMAGE_DIMS, params=params).model
 model.summary()
 
 if restore_from is not None:
@@ -117,7 +117,7 @@ print ("[INFO] training started...")
 tensorBoard = TensorBoard(log_dir='logs/{}'.format(time.time()))
 # checkpoint
 
-checkpoint = ModelCheckpoint("output/ckpts_dir", monitor='val_acc', period=5, verbose=1, save_best_only=True, mode='max')
+checkpoint = ModelCheckpoint(model_dir, monitor='val_acc', period=5, verbose=1, save_best_only=True, mode='max')
 callbacks_list = checkpoint
 
 M = model.fit_generator(

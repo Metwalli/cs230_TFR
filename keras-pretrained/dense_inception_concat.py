@@ -66,6 +66,7 @@ class DenseNetBaseModel():
         self.num_labels = num_labels
         self.use_imagenet_weights = use_imagenet_weights
         self.model = self.get_model()
+
     def get_model(self):
         base_model = load_densenet_model(self.use_imagenet_weights)
         classifier = Dense(self.num_labels, activation='softmax')(base_model.get_layer('avg_pool').output)

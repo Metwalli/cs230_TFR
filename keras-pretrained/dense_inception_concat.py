@@ -4,7 +4,7 @@ from keras.layers import Conv2D, Dense, Flatten, Input, BatchNormalization, \
     Activation, AveragePooling2D, MaxPooling2D, GlobalAveragePooling2D, Dropout, Concatenate
 from keras.models import Model
 from keras.backend import image_data_format
-from keras.applications import DenseNet121
+from keras.applications.densenet import DenseNet121
 from keras.utils import plot_model
 
 bn_axis = 3 if image_data_format() == 'channels_last' else 1
@@ -13,7 +13,7 @@ num_classes = 10
 
 
 def conv_layer(x, num_filters, kernel, stride=1, padding='same', layer_name="conv"):
-    conv = tf.keras.layers.Conv2D(num_filters,
+    conv = Conv2D(num_filters,
                   kernel_size=kernel,
                   use_bias=False,
                   strides=stride,
@@ -31,33 +31,33 @@ def Global_Average_Pooling(x, stride=1, name=None):
     It is global average pooling without tflearn
     """
 
-    return tf.keras.layers.GlobalAveragePooling2D(name='globas_actv')(x)
+    return GlobalAveragePooling2D(name='globas_actv')(x)
     # But maybe you need to install h5py and curses or not
 
 
 def Average_pooling(x, pool_size=[2, 2], stride=2, name=None):
-    return tf.keras.layers.AveragePooling2D(pool_size, strides=stride, name=str(name) + '_pool')(x)
+    return AveragePooling2D(pool_size, strides=stride, name=str(name) + '_pool')(x)
 
 
 def Max_Pooling(x, pool_size=[3, 3], stride=2, padding='SAME', name=None):
-    return tf.keras.layers.MaxPooling2D(pool_size=pool_size, strides=stride, padding=padding, name=name)(x)
+    return MaxPooling2D(pool_size=pool_size, strides=stride, padding=padding, name=name)(x)
 
 
 def activation_fn(x, name=None):
-    return tf.keras.layers.Activation('relu', name=name)(x)
+    return Activation('relu', name=name)(x)
 
 
 def batch_normalization_fn(x, name=None):
-    return tf.keras.layers.BatchNormalization(axis=bn_axis, epsilon=eps, name=name)(x)
+    return BatchNormalization(axis=bn_axis, epsilon=eps, name=name)(x)
 
 def dropout_fn(x, rate):
-    return tf.keras.layers.Dropout(rate=rate)(x)
+    return Dropout(rate=rate)(x)
 
 def classifier_fn(layer, num_labels=2, actv='softmax'):
-    return tf.keras.layers.Dense(num_labels, activation=actv)(layer)
+    return Dense(num_labels, activation=actv)(layer)
 
 def concat_fn(layers, name=None):
-    return tf.keras.layers.Concatenate(axis=bn_axis, name=name)(layers)
+    return Concatenate(axis=bn_axis, name=name)(layers)
 
 def load_densenet_model(use_weights):
     weights = 'imagenet' if use_weights == True else None
@@ -75,7 +75,7 @@ class DenseNetBaseModel():
     def get_model(self):
         base_model = load_densenet_model(self.use_imagenet_weights)
         classifier = classifier_fn(layer=base_model.get_layer('avg_pool').output, num_labels=self.num_labels, actv='softmax')
-        model = tf.keras.models.Model(inputs=base_model.input, outputs=classifier)
+        model = Model(inputs=base_model.input, outputs=classifier)
         return model
 
 # Injection pretrained Model
@@ -109,7 +109,7 @@ class DenseNetInceptionConcat():
 
         with tf.variable_scope('fc_2'):
             classifier = classifier_fn(layer=out, num_labels=self.num_labels, actv='softmax')
-        model = tf.keras.models.Model(inputs=base_model.input, outputs=classifier)
+        model = Model(inputs=base_model.input, outputs=classifier)
 
         return model
 

@@ -83,6 +83,7 @@ test_datagen = ImageDataGenerator(rescale=1./255)
 train_generator = train_datagen.flow_from_directory(
         train_dir,
         target_size=(IMAGE_DIMS[1], IMAGE_DIMS[1]),
+        batch_size=BS,
         class_mode='categorical')
 
 validation_generator = test_datagen.flow_from_directory(
@@ -101,10 +102,11 @@ if model_name == 'base':
 elif model_name == 'inject':
     model = DenseNetInceptionConcat(num_labels=CLASSES, use_imagenet_weights=use_imagenet_weights).model
 else:
-    model = DenseNetInception(input_shape= IMAGE_DIMS, params=params).model
+    model = DenseNetInception(input_shape=IMAGE_DIMS, params=params).model
 
+file_path = os.path.join(restore_from, "best.weights.hdf5")
 if restore_from is not None:
-    model.load_weights(os.path.join(model_dir, restore_from))
+    model.load_weights(file_path)
 
 print("[INFO] compiling model...")
 opt = Adam(lr=INIT_LR, decay=INIT_LR / EPOCHS)
@@ -113,10 +115,10 @@ model.compile(loss="categorical_crossentropy", optimizer=opt,
 
 print ("[INFO] training started...")
 
-tensorBoard = TensorBoard(log_dir='logs/{}'.format(time.time()))
+tensorBoard = TensorBoard(log_dir=os.path.join(model_dir, 'logs/{}'.format(time.time())))
 # checkpoint
-
-checkpoint = ModelCheckpoint(model_dir, monitor='val_acc', period=5, verbose=1, save_best_only=True, mode='max')
+file_path = os.path.join(model_dir, "checkpoints", "best.weights.hdf5")
+checkpoint = ModelCheckpoint(file_path, monitor='val_acc', period=5, verbose=1, save_best_only=True, mode='max')
 callbacks_list = checkpoint
 
 M = model.fit_generator(
@@ -130,4 +132,4 @@ M = model.fit_generator(
 
 # save the model to disk
 print("[INFO] serializing network...")
-model.save(os.path.join(model_dir, "last.weights.h5"))
+model.save(os.path.join(model_dir,  "checkpoints", "last.weights.h5"))

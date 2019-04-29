@@ -209,26 +209,3 @@ class DenseNetInception():
 
             return concat_feat
 
-    """
-    def Dense_net(self):
-
-        base_model = self.load_densenet_model()
-        base_block1_output = base_model.get_layer('conv2_block6_concat').output
-        base_block2_output = base_model.get_layer('conv4_block24_concat').output
-        base_block2_output = base_model.get_layer('conv5_block16_concat').output
-
-        input_layer = Input(shape=(56, 56, 3))
-        ince_A_ouptut = self.inception_module_A(input_layer, scope="IncepA")
-        concat = concatenate(ince_A_ouptut, base_model.get_layer('conv3_block12_concat').output)
-        ince_B_ouptut = self.inception_module_B(concat, scope="IncepB")
-        concat = concatenate(ince_B_ouptut, )
-        ince_C_ouptut = self.inception_module_C(concat, scope="IncepC")
-        concat = concatenate(ince_C_ouptut, )
-        out = batch_normalization_fn(concat, name="concat_bn")
-        out = activation_fn(out, name="out_bn")
-        out = GlobalAveragePooling2D(name='avg_pool')(out)
-        out = Dense(num_classes, activation="softmax", name="classification_layer")(out)
-        return Model(input=base_model.input, output=out)
-        
-    """
-

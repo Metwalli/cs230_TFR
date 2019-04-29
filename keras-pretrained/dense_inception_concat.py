@@ -4,7 +4,7 @@ from keras.layers import Conv2D, Dense, Flatten, Input, BatchNormalization, \
     Activation, AveragePooling2D, MaxPooling2D, GlobalAveragePooling2D, Dropout, Concatenate
 from keras.models import Model
 from keras.backend import image_data_format
-from keras.applications.densenet import DenseNet121
+from keras.applications import DenseNet121
 from keras.utils import plot_model
 
 bn_axis = 3 if image_data_format() == 'channels_last' else 1
@@ -13,7 +13,7 @@ num_classes = 10
 
 
 def conv_layer(x, num_filters, kernel, stride=1, padding='same', layer_name="conv"):
-    conv = Conv2D(num_filters,
+    conv = tf.keras.layers.Conv2D(num_filters,
                   kernel_size=kernel,
                   use_bias=False,
                   strides=stride,
@@ -31,28 +31,33 @@ def Global_Average_Pooling(x, stride=1, name=None):
     It is global average pooling without tflearn
     """
 
-    return GlobalAveragePooling2D(name='globas_actv')(x)
+    return tf.keras.layers.GlobalAveragePooling2D(name='globas_actv')(x)
     # But maybe you need to install h5py and curses or not
 
 
 def Average_pooling(x, pool_size=[2, 2], stride=2, name=None):
-    return AveragePooling2D(pool_size, strides=stride, name=str(name) + '_pool')(x)
+    return tf.keras.layers.AveragePooling2D(pool_size, strides=stride, name=str(name) + '_pool')(x)
 
 
 def Max_Pooling(x, pool_size=[3, 3], stride=2, padding='SAME', name=None):
-    return MaxPooling2D(pool_size=pool_size, strides=stride, padding=padding, name=name)(x)
+    return tf.keras.layers.MaxPooling2D(pool_size=pool_size, strides=stride, padding=padding, name=name)(x)
 
 
 def activation_fn(x, name=None):
-    return Activation('relu', name=name)(x)
+    return tf.keras.layers.Activation('relu', name=name)(x)
 
 
 def batch_normalization_fn(x, name=None):
-    return BatchNormalization(axis=bn_axis, epsilon=eps, name=name)(x)
-
+    return tf.keras.layers.BatchNormalization(axis=bn_axis, epsilon=eps, name=name)(x)
 
 def dropout_fn(x, rate):
-    return Dropout(rate=rate)(x)
+    return tf.keras.layers.Dropout(rate=rate)(x)
+
+def classifier_fn(layer, num_labels=2, actv='softmax'):
+    return tf.keras.layers.Dense(num_labels, activation=actv)(layer)
+
+def concat_fn(layers, name=None):
+    return tf.keras.layers.Concatenate(axis=bn_axis, name=name)(layers)
 
 def load_densenet_model(use_weights):
     weights = 'imagenet' if use_weights == True else None
@@ -69,8 +74,8 @@ class DenseNetBaseModel():
 
     def get_model(self):
         base_model = load_densenet_model(self.use_imagenet_weights)
-        classifier = Dense(self.num_labels, activation='softmax')(base_model.get_layer('avg_pool').output)
-        model = Model(inputs=base_model.input, outputs=classifier)
+        classifier = classifier_fn(layer=base_model.get_layer('avg_pool').output, num_labels=self.num_labels, actv='softmax')
+        model = tf.keras.models.Model(inputs=base_model.input, outputs=classifier)
         return model
 
 # Injection pretrained Model
@@ -90,21 +95,21 @@ class DenseNetInceptionConcat():
         incep_a = self.inception_module_A(block1_output, "incepA_")
 
         block2_output = base_model.get_layer('pool3_relu').output
-        concat = Concatenate(name="incepA_output_block2_output")([incep_a, block2_output])
+        concat = concat_fn([incep_a, block2_output], name="incepA_output_block2_output")
         incep_b = self.inception_module_B(concat, "incepB_")
 
         block3_output = base_model.get_layer('pool4_relu').output
-        concat = Concatenate(name="incepB_output_block3_output")([incep_b, block3_output])
+        concat = concat_fn([incep_b, block3_output], name="incepB_output_block3_output")
         incep_c = self.inception_module_C(concat, "incepC_")
 
         block4_output = base_model.get_layer('relu').output
-        concat = Concatenate(name="incepC_output_block4_output")([incep_c, block4_output])
-        
+        concat = concat_fn(layers=[incep_c, block4_output], name="incepC_output_block4_output")
+
         out = Global_Average_Pooling(concat)
 
         with tf.variable_scope('fc_2'):
-            classifier = Dense(self.num_labels, activation='softmax')(out)
-        model = Model(inputs=base_model.input, outputs=classifier)
+            classifier = classifier_fn(layer=out, num_labels=self.num_labels, actv='softmax')
+        model = tf.keras.models.Model(inputs=base_model.input, outputs=classifier)
 
         return model
 
@@ -125,7 +130,7 @@ class DenseNetInceptionConcat():
             x3 = batch_normalization_fn(x3)
             x3 = activation_fn(x3)
             x3 = conv_layer(x3, 64, kernel=[3, 3], layer_name=scope + "convX3_3")
-            concat = Concatenate(axis=bn_axis)([x1, x2, x3])
+            concat = concat_fn([x1, x2, x3])
             concat = batch_normalization_fn(concat)
             concat = activation_fn(concat)
             x4 = conv_layer(concat, 384, kernel=[1, 1], layer_name=scope + "convX4")
@@ -148,7 +153,7 @@ class DenseNetInceptionConcat():
             x2 = batch_normalization_fn(x2)
             x2 = activation_fn(x2)
             x2 = conv_layer(x2, 128, kernel=[7, 1], layer_name=scope + "convX2_3")
-            concat = Concatenate(axis=bn_axis)([x1, x2])
+            concat = concat_fn([x1, x2])
             concat = batch_normalization_fn(concat)
             concat = activation_fn(concat)
 
@@ -171,7 +176,7 @@ class DenseNetInceptionConcat():
             x2 = batch_normalization_fn(x2)
             x2 = activation_fn(x2)
             x2 = conv_layer(x2, 128, kernel=[3, 1], layer_name=scope + "convX2_3")
-            concat = Concatenate(axis=bn_axis)([x1, x2])
+            concat = concat_fn([x1, x2])
             concat = batch_normalization_fn(concat)
             concat = activation_fn(concat)
 
@@ -228,9 +233,9 @@ class DenseNetInception():
             out = Global_Average_Pooling(out)
 
             with tf.variable_scope('fc_2'):
-                logits = Dense(self.num_labels)(out)
+                classifier = classifier_fn(layer=out, num_labels=self.num_labels)
 
-            model = Model(input=input_layer, output=logits)
+            model = Model(input=input_layer, output=classifier)
 
         return model
 
@@ -255,7 +260,7 @@ class DenseNetInception():
             x3 = batch_normalization_fn(x3)
             x3 = activation_fn(x3)
             x3 = conv_layer(x3, 64, kernel=[3, 3], layer_name=scope + "convX3_3")
-            concat = Concatenate(axis=bn_axis)([x1, x2, x3])
+            concat = concat_fn([x1, x2, x3])
             concat = batch_normalization_fn(concat)
             concat = activation_fn(concat)
             x4 = conv_layer(concat, 384, kernel=[1, 1], layer_name=scope + "convX4")
@@ -278,7 +283,7 @@ class DenseNetInception():
             x2 = batch_normalization_fn(x2)
             x2 = activation_fn(x2)
             x2 = conv_layer(x2, 128, kernel=[7, 1], layer_name=scope + "convX2_3")
-            concat = Concatenate(axis=bn_axis)([x1, x2])
+            concat = concat_fn([x1, x2])
             concat = batch_normalization_fn(concat)
             concat = activation_fn(concat)
 
@@ -301,7 +306,7 @@ class DenseNetInception():
             x2 = batch_normalization_fn(x2)
             x2 = activation_fn(x2)
             x2 = conv_layer(x2, 128, kernel=[3, 1], layer_name=scope + "convX2_3")
-            concat = Concatenate(axis=bn_axis)([x1, x2])
+            concat = concat_fn([x1, x2])
             concat = batch_normalization_fn(concat)
             concat = activation_fn(concat)
 
@@ -331,7 +336,7 @@ class DenseNetInception():
             for i in range(nb_layers):
                 x = self.bottleneck_layer(concat_feat, no_filters=self.growth_rate,
                                           scope=layer_name + '_bottleN_' + str(i + 1))
-                concat_feat = Concatenate(axis=3)([concat_feat, x])
+                concat_feat = concat_fn([concat_feat, x])
 
             #                 self.num_filters += self.growth_rate
 

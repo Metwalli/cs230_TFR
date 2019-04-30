@@ -23,7 +23,6 @@
     "model_name": "base",
     "results_path": "output/results.txt",
     "model_path"      : "output/model",
-    "history_filename" : "history_filename.json",
     "classifier_path" : "output/classifier",
     "use_imagenet_weights": true
 

@@ -18,6 +18,7 @@ import json, codecs
 # from dense_inception import DenseNetInception
 from dense_inception_concat import DenseNetInceptionConcat, DenseNetBaseModel, DenseNetInception
 from utils import Params
+from loss_history import LossHistory
 
 
 
@@ -65,7 +66,7 @@ model_path = params.model_path
 model_name = params.model_name
 use_imagenet_weights = params.use_imagenet_weights
 save_period_step = params.save_period_step
-history_filename = os.path.join(model_dir, params.history_filename)
+history_filename = os.path.join(model_dir, "history_filename.json")
 
 if data_dir is None:
     data_dir = params.data_dir
@@ -114,14 +115,10 @@ else:
 
 
 # Initial checkpoints and Tensorboard to monitor training
-if os.path.exists(history_filename):
-    with codecs.open(history_filename, 'r', encoding='utf-8') as f:
-        saved_history = json.loads(f.read())
-        initial_epoch = len(saved_history['loss'])
-        EPOCHS += initial_epoch
-else:
-    saved_history = {}
-    initial_epoch = 0
+
+loss_history = LossHistory(history_filename)
+initial_epoch = loss_history.get_initial_epoch()
+EPOCHS += initial_epoch
 
 print("[INFO] compiling model...")
 opt = Adam(lr=INIT_LR, decay=INIT_LR / EPOCHS)
@@ -134,19 +131,14 @@ checkpoint = ModelCheckpoint(file_path, monitor='val_acc', period=save_period_st
 callbacks_list = checkpoint
 
 print("[INFO] training started...")
-new_history = model.fit_generator(
+history = model.fit_generator(
         train_generator,
         steps_per_epoch=train_generator.n // train_generator.batch_size,
         initial_epoch=initial_epoch,
         epochs=EPOCHS,
         validation_data=validation_generator,
         validation_steps=validation_generator.n // validation_generator.batch_size,
-        callbacks=[callbacks_list, tensorBoard])
-
-history = append_history(saved_history, new_history.history)
-
-with codecs.open(history_filename, 'w', encoding='utf-8') as f:
-    json.dump(history, f, separators=(',', ':'), sort_keys=True, indent=4)
+        callbacks=[callbacks_list, loss_history, tensorBoard])
 
 # save the model to disk
 print("Saved model to disk")

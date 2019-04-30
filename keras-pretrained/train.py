@@ -119,18 +119,20 @@ validation_generator = test_datagen.flow_from_directory(
         batch_size=BS,
         class_mode='categorical')
 # grab the test image paths and randomly shuffle them
-imagePaths = sorted(list(paths.list_images(os.path.join(args["dataset"], "test"))))
-random.seed(42)
-random.shuffle(imagePaths)
-validation_X, validation_Y, lb = load_dataset(imagePaths)
+# imagePaths = sorted(list(paths.list_images(os.path.join(data_dir, "test"))))
+# random.seed(42)
+# random.shuffle(imagePaths)
+# validation_X, validation_Y, lb = load_dataset(imagePaths)
+# tensorBoard = TensorBoardWrapper(validation_generator, nb_steps=5, log_dir=os.path.join(model_dir, 'logs/{}'.format(time.time())), histogram_freq=1,
+#                                batch_size=32, write_graph=False, write_grads=True)
 
 CLASSES = train_generator.num_classes
 params.num_labels = CLASSES
 
 # initialize the model
 print("[INFO] creating model...")
-overwrite = os.path.exists(history_filename) and restore_from is None
-assert not overwrite, "Weights found in model_dir, aborting to avoid overwrite"
+overwriting = os.path.exists(history_filename) and restore_from is None
+assert not overwriting, "Weights found in model_dir, aborting to avoid overwrite"
 loss_history = LossHistory(history_filename)
 initial_epoch = loss_history.get_initial_epoch()
 EPOCHS += initial_epoch
@@ -157,9 +159,8 @@ opt = Adam(lr=INIT_LR, decay=INIT_LR / EPOCHS)
 model.compile(loss="categorical_crossentropy", optimizer=opt,
               metrics=["accuracy"])
 
-tensorBoard = TensorBoardWrapper(validation_generator, nb_steps=5, log_dir=os.path.join(model_dir, 'logs/{}'.format(time.time())), histogram_freq=1,
-                               batch_size=32, write_graph=False, write_grads=True)
-# tensorBoard = TensorBoard(log_dir=os.path.join(model_dir, 'logs/{}'.format(time.time())), write_images=True, histogram_freq=2)
+
+tensorBoard = TensorBoard(log_dir=os.path.join(model_dir, 'logs/{}'.format(time.time())), write_images=True)
 file_path = os.path.join(model_dir, "checkpoints", "best.weights.hdf5")
 checkpoint = ModelCheckpoint(file_path, monitor='val_acc', period=save_period_step, verbose=1, save_best_only=True, mode='max')
 callbacks_list = checkpoint
@@ -170,8 +171,8 @@ history = model.fit_generator(
         steps_per_epoch=train_generator.n // train_generator.batch_size,
         initial_epoch=initial_epoch,
         epochs=EPOCHS,
-        validation_data=(validation_X, validation_Y),
-        validation_steps=len(validation_X) // BS,
+        validation_data=validation_generator,
+        validation_steps=validation_generator.n // validation_generator.batch_size,
         callbacks=[callbacks_list, loss_history, tensorBoard])
 
 # save the model to disk

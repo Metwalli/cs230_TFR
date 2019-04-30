@@ -5,17 +5,21 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import argparse
 from keras.optimizers import Adam
+from keras.preprocessing.image import img_to_array
 from keras.preprocessing.image import ImageDataGenerator
 from tensorflow.python.keras.callbacks import TensorBoard
 from keras.callbacks import ModelCheckpoint
 from keras.models import load_model
 import time
 import os
-import json, codecs
-
-
+import cv2
+import numpy as np
+from sklearn.preprocessing import LabelBinarizer
+from imutils import paths
+import random
 
 # from dense_inception import DenseNetInception
+from tensorboard_wrapper import TensorBoardWrapper
 from dense_inception_concat import DenseNetInceptionConcat, DenseNetBaseModel, DenseNetInception
 from utils import Params
 from loss_history import LossHistory
@@ -36,14 +40,33 @@ args = vars(ap.parse_args())
 # initialize the number of epochs to train for, initial learning rate,
 # batch size, and image dimensions
 
-def append_history(h1, h2):
-    if h1 == {}:
-        return h2
-    else:
-        dest = {}
-        for key, value in h1.items():
-            dest[key] = value + h2[key]
-        return dest
+def load_dataset(imagePaths):
+    data = []
+    labels = []
+    # loop over the input images
+    for imagePath in imagePaths:
+        # load the image, pre-process it, and store it in the data list
+        image = cv2.imread(imagePath)
+        image = cv2.resize(image, (IMAGE_DIMS[1], IMAGE_DIMS[0]))
+        image = img_to_array(image)
+        data.append(image)
+        # extract the class label from the image path and update the
+        # labels list
+        label = imagePath.split(os.path.sep)[-2]
+        labels.append(label)
+
+    # scale the raw pixel intensities to the range [0, 1]
+    data = np.array(data, dtype="float") / 255.0
+    labels = np.array(labels)
+    print("[INFO] data matrix: {:.2f}MB".format(
+        data.nbytes / (1024 * 1000.0)))
+
+    # binarize the labels
+    lb = LabelBinarizer()
+    labels = lb.fit_transform(labels)
+
+    return data, labels, lb
+
 # Arguments
 data_dir = args["data_dir"]
 model_dir = args["model_dir"]
@@ -66,7 +89,7 @@ model_path = params.model_path
 model_name = params.model_name
 use_imagenet_weights = params.use_imagenet_weights
 save_period_step = params.save_period_step
-history_filename = os.path.join(model_dir, "history_filename.json")
+history_filename = os.path.join(model_dir, "train_fit_history.json")
 
 if data_dir is None:
     data_dir = params.data_dir
@@ -82,24 +105,35 @@ train_datagen = ImageDataGenerator(rotation_range=25,
                                    zoom_range=0.2,
                                    horizontal_flip=True)
 
-test_datagen = ImageDataGenerator(rescale=1./255)
+
 train_generator = train_datagen.flow_from_directory(
         train_dir,
         target_size=(IMAGE_DIMS[1], IMAGE_DIMS[1]),
         batch_size=BS,
         class_mode='categorical')
 
+test_datagen = ImageDataGenerator(rescale=1./255)
 validation_generator = test_datagen.flow_from_directory(
         valid_dir,
         target_size=(IMAGE_DIMS[1], IMAGE_DIMS[1]),
         batch_size=BS,
         class_mode='categorical')
+# grab the test image paths and randomly shuffle them
+imagePaths = sorted(list(paths.list_images(os.path.join(args["dataset"], "test"))))
+random.seed(42)
+random.shuffle(imagePaths)
+validation_X, validation_Y, lb = load_dataset(imagePaths)
 
 CLASSES = train_generator.num_classes
 params.num_labels = CLASSES
 
 # initialize the model
 print("[INFO] creating model...")
+overwrite = os.path.exists(history_filename) and restore_from is None
+assert not overwrite, "Weights found in model_dir, aborting to avoid overwrite"
+loss_history = LossHistory(history_filename)
+initial_epoch = loss_history.get_initial_epoch()
+EPOCHS += initial_epoch
 if restore_from is None:
     if model_name == 'base':
         model = DenseNetBaseModel(CLASSES, use_imagenet_weights).model
@@ -110,22 +144,22 @@ if restore_from is None:
 else:
     # Restore Model
     file_path = os.path.join(restore_from, "best.weights.hdf5")
-    assert not os.path.exists(file_path), "No model in restore from directory"
+    assert os.path.exists(file_path), "No model in restore from directory"
     model = load_model(file_path)
 
 
 # Initial checkpoints and Tensorboard to monitor training
 
-loss_history = LossHistory(history_filename)
-initial_epoch = loss_history.get_initial_epoch()
-EPOCHS += initial_epoch
+
 
 print("[INFO] compiling model...")
 opt = Adam(lr=INIT_LR, decay=INIT_LR / EPOCHS)
 model.compile(loss="categorical_crossentropy", optimizer=opt,
               metrics=["accuracy"])
 
-tensorBoard = TensorBoard(log_dir=os.path.join(model_dir, 'logs/{}'.format(time.time())), write_images=True, histogram_freq=2)
+tensorBoard = TensorBoardWrapper(validation_generator, nb_steps=5, log_dir=os.path.join(model_dir, 'logs/{}'.format(time.time())), histogram_freq=1,
+                               batch_size=32, write_graph=False, write_grads=True)
+# tensorBoard = TensorBoard(log_dir=os.path.join(model_dir, 'logs/{}'.format(time.time())), write_images=True, histogram_freq=2)
 file_path = os.path.join(model_dir, "checkpoints", "best.weights.hdf5")
 checkpoint = ModelCheckpoint(file_path, monitor='val_acc', period=save_period_step, verbose=1, save_best_only=True, mode='max')
 callbacks_list = checkpoint
@@ -136,8 +170,8 @@ history = model.fit_generator(
         steps_per_epoch=train_generator.n // train_generator.batch_size,
         initial_epoch=initial_epoch,
         epochs=EPOCHS,
-        validation_data=validation_generator,
-        validation_steps=validation_generator.n // validation_generator.batch_size,
+        validation_data=(validation_X, validation_Y),
+        validation_steps=len(validation_X) // BS,
         callbacks=[callbacks_list, loss_history, tensorBoard])
 
 # save the model to disk
@@ -163,7 +197,3 @@ plt.ylabel("Loss")
 plt.legend(['Train', 'Test'], loc="upper left")
 plt.savefig(os.path.join(model_dir, "loss_plot.png"))
 plt.show()
-
-results = open(os.path.join(model_dir, "results.txt"), "w")
-results.write(history.history)
-results.close()

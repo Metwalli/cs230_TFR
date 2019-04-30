@@ -2,30 +2,23 @@
 from __future__ import print_function
 
 import pandas as pd
-from keras.optimizers import Adam
-# from keras.applications.inception_v3 import InceptionV3, preprocess_input
-# from keras.applications.densenet import DenseNet121
-# from keras.layers import Flatten, Input, Dense
-# from sklearn.metrics import classification_report
-# from sklearn.model_selection import train_test_split
-# from sklearn.linear_model import LogisticRegression
-# from sklearn.metrics import confusion_matrix
-import numpy as np
-# import h5py
 import matplotlib.pyplot as plt
 import argparse
+from keras.optimizers import Adam
 from keras.preprocessing.image import ImageDataGenerator
 from tensorflow.python.keras.callbacks import TensorBoard
 from keras.callbacks import ModelCheckpoint
+from keras.models import load_model
 import time
 import os
+import json, codecs
+
+
 
 # from dense_inception import DenseNetInception
 from dense_inception_concat import DenseNetInceptionConcat, DenseNetBaseModel, DenseNetInception
 from utils import Params
-# import pickle
-# import seaborn as sns
-# import matplotlib.pyplot as plt
+
 
 
 ap = argparse.ArgumentParser()
@@ -42,7 +35,14 @@ args = vars(ap.parse_args())
 # initialize the number of epochs to train for, initial learning rate,
 # batch size, and image dimensions
 
-
+def append_history(h1, h2):
+    if h1 == {}:
+        return h2
+    else:
+        dest = {}
+        for key, value in h1.items():
+            dest[key] = value + h2[key]
+        return dest
 # Arguments
 data_dir = args["data_dir"]
 model_dir = args["model_dir"]
@@ -65,13 +65,11 @@ model_path = params.model_path
 model_name = params.model_name
 use_imagenet_weights = params.use_imagenet_weights
 save_period_step = params.save_period_step
-
+history_filename = os.path.join(model_dir, params.history_filename)
 
 if data_dir is None:
     data_dir = params.data_dir
 
-if restore_from is not None:
-    use_imagenet_weights = False
 
 # Dataset Directory
 train_dir = os.path.join(data_dir, "train")
@@ -100,64 +98,79 @@ CLASSES = train_generator.num_classes
 params.num_labels = CLASSES
 
 # initialize the model
-print ("[INFO] creating model...")
-if model_name == 'base':
-    model = DenseNetBaseModel(CLASSES, use_imagenet_weights).model
-elif model_name == 'inject':
-    model = DenseNetInceptionConcat(num_labels=CLASSES, use_imagenet_weights=use_imagenet_weights).model
+print("[INFO] creating model...")
+if restore_from is None:
+    if model_name == 'base':
+        model = DenseNetBaseModel(CLASSES, use_imagenet_weights).model
+    elif model_name == 'inject':
+        model = DenseNetInceptionConcat(num_labels=CLASSES, use_imagenet_weights=use_imagenet_weights).model
+    else:
+        model = DenseNetInception(input_shape=IMAGE_DIMS, params=params).model
 else:
-    model = DenseNetInception(input_shape=IMAGE_DIMS, params=params).model
-
-# Restore Model
-if restore_from is not None:
+    # Restore Model
     file_path = os.path.join(restore_from, "best.weights.hdf5")
-    model.load_weights(file_path)
+    assert not os.path.exists(file_path), "No model in restore from directory"
+    model = load_model(file_path)
+
+
+# Initial checkpoints and Tensorboard to monitor training
+if os.path.exists(history_filename):
+    with codecs.open(history_filename, 'r', encoding='utf-8') as f:
+        saved_history = json.loads(f.read())
+        initial_epoch = len(saved_history['loss'])
+        EPOCHS += initial_epoch
+else:
+    saved_history = {}
+    initial_epoch = 0
 
 print("[INFO] compiling model...")
 opt = Adam(lr=INIT_LR, decay=INIT_LR / EPOCHS)
 model.compile(loss="categorical_crossentropy", optimizer=opt,
               metrics=["accuracy"])
 
-print ("[INFO] training started...")
-
-tensorBoard = TensorBoard(log_dir=os.path.join(model_dir, 'logs/{}'.format(time.time())))
-# checkpoint
+tensorBoard = TensorBoard(log_dir=os.path.join(model_dir, 'logs/{}'.format(time.time())), write_images=True, histogram_freq=2)
 file_path = os.path.join(model_dir, "checkpoints", "best.weights.hdf5")
 checkpoint = ModelCheckpoint(file_path, monitor='val_acc', period=save_period_step, verbose=1, save_best_only=True, mode='max')
 callbacks_list = checkpoint
 
-history = model.fit_generator(
+print("[INFO] training started...")
+new_history = model.fit_generator(
         train_generator,
         steps_per_epoch=train_generator.n // train_generator.batch_size,
+        initial_epoch=initial_epoch,
         epochs=EPOCHS,
         validation_data=validation_generator,
         validation_steps=validation_generator.n // validation_generator.batch_size,
         callbacks=[callbacks_list, tensorBoard])
 
+history = append_history(saved_history, new_history.history)
+
+with codecs.open(history_filename, 'w', encoding='utf-8') as f:
+    json.dump(history, f, separators=(',', ':'), sort_keys=True, indent=4)
 
 # save the model to disk
-print("[INFO] serializing network...")
-model.save(os.path.join(model_dir,  "checkpoints", "last.weights.h5"))
+print("Saved model to disk")
+model.save(os.path.join(model_dir,  "checkpoints", "last.weights.hdf5"))
 
-# plot the training loss and accuracy
-plt.style.use("ggplot")
-plt.figure()
-N = EPOCHS
-plt.plot(np.arange(0, N), history.history["loss"], label="train_loss")
-plt.plot(np.arange(0, N), history.history["val_loss"], label="val_loss")
-plt.title("Training Loss")
-plt.xlabel("Epoch #")
-plt.ylabel("Loss")
-plt.legend(loc="upper left")
-plt.savefig(os.path.join(model_dir, "loss_plot.png"))
+# plot the training Accuracy and loss
 
-plt.plot(np.arange(0, N), history.history["acc"], label="train_acc")
-plt.plot(np.arange(0, N), history.history["val_acc"], label="val_acc")
-plt.title("Training Accuracy")
+plt.plot(history.history["acc"])
+plt.plot(history.history["val_acc"])
+plt.title("Model Accuracy")
 plt.xlabel("Epoch #")
 plt.ylabel("Accuracy")
-plt.legend(loc="upper left")
+plt.legend(['Train', 'Test'], loc="upper left")
 plt.savefig(os.path.join(model_dir, "accuracy_plot.png"))
+plt.show()
+
+plt.plot(history.history["loss"])
+plt.plot(history.history["val_loss"])
+plt.title("Model Loss")
+plt.xlabel("Epoch #")
+plt.ylabel("Loss")
+plt.legend(['Train', 'Test'], loc="upper left")
+plt.savefig(os.path.join(model_dir, "loss_plot.png"))
+plt.show()
 
 results = open(os.path.join(model_dir, "results.txt"), "w")
 results.write(history.history)

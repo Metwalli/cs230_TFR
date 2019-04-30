@@ -1,5 +1,5 @@
 {
-    "learning_rate": 1e-4,
+    "learning_rate": 1e-2,
     "eps": 1.1e-5,
     "batch_size": 20,
     "num_epochs": 10,
@@ -23,6 +23,7 @@
     "model_name": "base",
     "results_path": "output/results.txt",
     "model_path"      : "output/model",
+    "history_filename" : "history_filename.json",
     "classifier_path" : "output/classifier",
     "use_imagenet_weights": true
 

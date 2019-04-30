@@ -24,6 +24,7 @@
     "results_path": "output/results.txt",
     "model_path"      : "output/model",
     "classifier_path" : "output/classifier",
+    "history_filename" : "history_filename.json",
     "use_imagenet_weights": true
 
 }

@@ -92,15 +92,15 @@ class DenseNetInceptionConcat():
         base_model = load_densenet_model(self.use_imagenet_weights)
 
         block1_output = base_model.get_layer('pool2_relu').output
-        incep_a = self.inception_module_A(block1_output, "incepA_")
+        incep_a = self.inception_module_A(block1_output, scope="incepA_")
 
         block2_output = base_model.get_layer('pool3_relu').output
         concat = concat_fn([incep_a, block2_output], name="incepA_output_block2_output")
-        incep_b = self.inception_module_B(concat, "incepB_")
+        incep_b = self.inception_module_B(concat, scope="incepB_")
 
         block3_output = base_model.get_layer('pool4_relu').output
         concat = concat_fn([incep_b, block3_output], name="incepB_output_block3_output")
-        incep_c = self.inception_module_C(concat, "incepC_")
+        incep_c = self.inception_module_C(concat, scope="incepC_")
 
         block4_output = base_model.get_layer('relu').output
         concat = concat_fn(layers=[incep_c, block4_output], name="incepC_output_block4_output")

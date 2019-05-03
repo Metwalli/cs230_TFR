@@ -80,7 +80,7 @@ def Global_Average_Pooling(x, stride=1, name=None):
 
 
 def Average_pooling(x, pool_size=[2, 2], stride=2, name=None):
-    return AveragePooling2D(pool_size, strides=stride, name=str(name) + '_pool')(x)
+    return AveragePooling2D(pool_size, strides=stride, name=name)(x)
 
 
 def Max_Pooling(x, pool_size=[3, 3], stride=2, padding='SAME', name=None):
@@ -106,7 +106,7 @@ def concat_fn(layers, name=None):
 def load_densenet_model(use_weights):
     weights = 'imagenet' if use_weights == True else None
     base_model = DenseNet121(include_top=False, weights=weights, input_tensor=Input(shape=(224, 224, 3)),
-                             input_shape=(224, 224, 3), pooling='avg')
+                             input_shape=(224, 224, 3))
     return base_model
 
 def load_inception_model(use_weights):
@@ -115,6 +115,21 @@ def load_inception_model(use_weights):
                              input_shape=(224, 224, 3), pooling='avg')
     return base_model
 
+class DenseNetInceptionModel():
+    def __init__(self, num_labels, use_imagenet_weights=True):
+        self.num_labels = num_labels
+        self.use_imagenet_weights = use_imagenet_weights
+        self.model = self.get_model()
+
+    def get_model(self):
+        dense_model = load_densenet_model(self.use_imagenet_weights)
+        dense_out = dense_model.layers[-1]
+        inception_model = load_inception_model(self.use_imagenet_weights)
+        inception_out = inception_model.layers[-1]
+        out = concat_fn([dense_out, inception_out])
+        classifier = classifier_fn(layer=out, num_labels=self.num_labels, actv='softmax')
+        model = Model(inputs=[dense_model.input, inception_model.input], outputs=classifier)
+        return model
 
 # Base Model
 class DenseNetBaseModel():
@@ -142,25 +157,27 @@ class DenseNetInceptionConcat():
 
         base_model = load_densenet_model(self.use_imagenet_weights)
 
-        block1_output = base_model.get_layer('pool2_relu').output
-        incep_a = self.inception_module_A(block1_output, scope="incepA_")
-        incep_a = self.inception_module_A(incep_a, scope="incepA2_")
-        incep_a = Average_pooling(incep_a, pool_size=[2, 2], stride=2)
-
-        block2_output = base_model.get_layer('pool3_relu').output
-        concat = concat_fn([incep_a, block2_output], name="incepA_output_block2_output")
-        incep_b = self.inception_module_B(concat, scope="incepB_")
-        incep_b = Average_pooling(incep_b, pool_size=[2, 2], stride=2)
-
-        block3_output = base_model.get_layer('pool4_relu').output
-        concat = concat_fn([incep_b, block3_output], name="incepB_output_block3_output")
-        incep_c = self.inception_module_C(concat, scope="incepC_")
-        incep_c = Average_pooling(incep_c, pool_size=[2, 2], stride=2)
+        # block1_output = base_model.get_layer('pool2_relu').output
+        # incep_a = self.inception_module_A(block1_output, scope="incepA_")
+        # incep_a = self.inception_module_A(incep_a, scope="incepA2_")
+        # incep_a = Average_pooling(incep_a, pool_size=[2, 2], stride=2)
+        #
+        # block2_output = base_model.get_layer('pool3_relu').output
+        # concat = concat_fn([incep_a, block2_output], name="incepA_output_block2_output")
+        # incep_b = self.inception_module_B(concat, scope="incepB_")
+        # incep_b = Average_pooling(incep_b, pool_size=[2, 2], stride=2)
+        #
+        # block3_output = base_model.get_layer('pool4_relu').output
+        # concat = concat_fn([incep_b, block3_output], name="incepB_output_block3_output")
+        # incep_c = self.inception_module_C(concat, scope="incepC_")
+        # incep_c = Average_pooling(incep_c, pool_size=[2, 2], stride=2)
 
         block4_output = base_model.get_layer('relu').output
-        concat = concat_fn(layers=[incep_c, block4_output], name="incepC_output_block4_output")
+        incep_c = self.inception_module_C(block4_output, scope="incepC_")
 
-        out = Global_Average_Pooling(concat)
+        # concat = concat_fn(layers=[incep_c, block4_output], name="incepC_output_block4_output")
+
+        out = Global_Average_Pooling(incep_c)
 
         with tf.variable_scope('fc_2'):
             classifier = classifier_fn(layer=out, num_labels=self.num_labels, actv='softmax')

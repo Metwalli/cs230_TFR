@@ -1,31 +1,34 @@
-# organize imports
-from __future__ import print_function
-import keras.applications.inception_resnet_v2
-import pandas as pd
-import matplotlib.pyplot as plt
-import argparse
-from keras.optimizers import Adam
-from keras.preprocessing.image import img_to_array
-from keras.preprocessing.image import ImageDataGenerator
-from tensorflow.python.keras.callbacks import TensorBoard
-from keras.callbacks import ModelCheckpoint
-from keras.models import load_model
-import time
-import os
-import cv2
-import numpy as np
-from sklearn.preprocessing import LabelBinarizer
-from imutils import paths
-import random
 
-# from dense_inception import DenseNetInception
-from tensorboard_wrapper import TensorBoardWrapper
+# USAGE
+# python train.py --dataset dataset --model pokedex.model --labelbin lb.pickle
+
+# set the matplotlib backend so figures can be saved in the background
+
+import tensorflow as tf
+import matplotlib
+import time
+matplotlib.use("Agg")
+from keras.preprocessing.image import ImageDataGenerator
+from keras.optimizers import Adam
+from keras.layers import Input
+from keras.models import Model
+from keras.models import load_model
+from keras.objectives import categorical_crossentropy
+from keras.optimizers import SGD
+from keras.callbacks import ModelCheckpoint
+import os
+import matplotlib.pyplot as plt
+import numpy as np
+import argparse
+
+from tensorflow.python.keras.callbacks import TensorBoard
 from dense_inception_concat import DenseNetInceptionConcat, DenseNetBaseModel, DenseNetInception
 from utils import Params
 from loss_history import LossHistory
+from input_fn import input_fn
 
 
-
+# construct the argument parse and parse the arguments
 ap = argparse.ArgumentParser()
 ap.add_argument("-d", "--data_dir", required=False,
                 help="path to input dataset (i.e., directory of images)")
@@ -37,43 +40,14 @@ ap.add_argument("-p", "--plot", type=str, default="plot.png",
                 help="path to output accuracy/loss plot")
 args = vars(ap.parse_args())
 
+# /home/ai309/metwalli/project-test-1/dense_food/experiments/vireo10_aug4
 # initialize the number of epochs to train for, initial learning rate,
 # batch size, and image dimensions
-
-def load_dataset(imagePaths):
-    data = []
-    labels = []
-    # loop over the input images
-    for imagePath in imagePaths:
-        # load the image, pre-process it, and store it in the data list
-        image = cv2.imread(imagePath)
-        image = cv2.resize(image, (IMAGE_DIMS[1], IMAGE_DIMS[0]))
-        image = img_to_array(image)
-        data.append(image)
-        # extract the class label from the image path and update the
-        # labels list
-        label = imagePath.split(os.path.sep)[-2]
-        labels.append(label)
-
-    # scale the raw pixel intensities to the range [0, 1]
-    data = np.array(data, dtype="float") / 255.0
-    labels = np.array(labels)
-    print("[INFO] data matrix: {:.2f}MB".format(
-        data.nbytes / (1024 * 1000.0)))
-
-    # binarize the labels
-    lb = LabelBinarizer()
-    labels = lb.fit_transform(labels)
-
-    return data, labels, lb
 
 # Arguments
 data_dir = args["data_dir"]
 model_dir = args["model_dir"]
 restore_from = args["restore_from"]
-
-
-# load the user configs
 
 params = Params(os.path.join(model_dir, 'params.json'))
 
@@ -90,44 +64,40 @@ model_name = params.model_name
 use_imagenet_weights = params.use_imagenet_weights
 save_period_step = params.save_period_step
 history_filename = os.path.join(model_dir, "train_fit_history.json")
+CLASSES = params.num_labels
 
 if data_dir is None:
     data_dir = params.data_dir
 
+# grab the train image paths and randomly shuffle them
+print("[INFO] loading images...")
+train_tf = os.path.join(data_dir, "train.tfrecord")
+eval_tf = os.path.join(data_dir, "test.tfrecord")
 
-# Dataset Directory
-train_dir = os.path.join(data_dir, "train")
-valid_dir = os.path.join(data_dir, "test")
-train_datagen = ImageDataGenerator(rotation_range=25,
-                                   width_shift_range=0.1,
-                                   rescale=1./255,
-                                   shear_range=0.2,
-                                   zoom_range=0.2,
-                                   horizontal_flip=True)
+train_size = len([x for x in tf.python_io.tf_record_iterator(train_tf)])
+eval_size = len([x for x in tf.python_io.tf_record_iterator(eval_tf)])
 
+x_train_batch, y_train_batch = input_fn(
+    train_tf,
+    one_hot=True,
+    classes=CLASSES,
+    is_training=True,
+    batch_shape=[BS, IMAGE_DIMS[1], IMAGE_DIMS[1], 3],
+    parallelism=4)
+x_test_batch, y_test_batch = input_fn(
+    eval_tf,
+    one_hot=True,
+    classes=CLASSES,
+    is_training=True,
+    batch_shape=[BS, IMAGE_DIMS[1], IMAGE_DIMS[1], 3],
+    parallelism=4)
 
-train_generator = train_datagen.flow_from_directory(
-        train_dir,
-        target_size=(IMAGE_DIMS[1], IMAGE_DIMS[1]),
-        batch_size=BS,
-        class_mode='categorical')
+x_batch_shape = x_train_batch.get_shape().as_list()
+y_batch_shape = y_train_batch.get_shape().as_list()
 
-test_datagen = ImageDataGenerator(rescale=1./255)
-validation_generator = test_datagen.flow_from_directory(
-        valid_dir,
-        target_size=(IMAGE_DIMS[1], IMAGE_DIMS[1]),
-        batch_size=BS,
-        class_mode='categorical')
-# grab the test image paths and randomly shuffle them
-# imagePaths = sorted(list(paths.list_images(os.path.join(data_dir, "test"))))
-# random.seed(42)
-# random.shuffle(imagePaths)
-# validation_X, validation_Y, lb = load_dataset(imagePaths)
-# tensorBoard = TensorBoardWrapper(validation_generator, nb_steps=5, log_dir=os.path.join(model_dir, 'logs/{}'.format(time.time())), histogram_freq=1,
-#                                batch_size=32, write_graph=False, write_grads=True)
+x_train_input = Input(tensor=x_train_batch, batch_shape=x_batch_shape)
+y_train_in_out = Input(tensor=y_train_batch, batch_shape=y_batch_shape, name='y_labels')
 
-CLASSES = train_generator.num_classes
-params.num_labels = CLASSES
 
 # initialize the model
 print("[INFO] creating model...")
@@ -152,6 +122,10 @@ else:
 
 # Initial checkpoints and Tensorboard to monitor training
 
+cce = categorical_crossentropy(y_train_batch, model)
+model = Model(inputs=[x_train_input], outputs=[model])
+model.add_loss(cce)
+
 
 
 print("[INFO] compiling model...")
@@ -174,13 +148,9 @@ last_checkpoint = ModelCheckpoint(os.path.join(model_dir, "checkpoints", "last.w
                                   verbose=1, mode='max')
 
 print("[INFO] training started...")
-history = model.fit_generator(
-        train_generator,
-        steps_per_epoch=train_generator.n // train_generator.batch_size,
-        initial_epoch=initial_epoch,
-        epochs=EPOCHS,
-        validation_data=validation_generator,
-        validation_steps=validation_generator.n // validation_generator.batch_size,
+
+history = model.fit(epochs=EPOCHS,
+        steps_per_epoch=train_size//BS,
         callbacks=[best_checkpoint, last_checkpoint, loss_history, tensorBoard])
 
 # save the model to disk

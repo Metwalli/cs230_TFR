@@ -5,11 +5,55 @@ from keras.layers import Conv2D, Dense, Flatten, Input, BatchNormalization, \
 from keras.models import Model
 from keras.backend import image_data_format
 from keras.applications.densenet import DenseNet121
+from keras.applications.inception_v3 import InceptionV3
 from keras.utils import plot_model
 
-bn_axis = 3 if image_data_format() == 'channels_last' else 1
+channel_axis = 3 if image_data_format() == 'channels_last' else 1
 eps = 1.001e-5
 num_classes = 10
+
+def conv2d_bn(x,
+              filters,
+              num_row,
+              num_col,
+              padding='same',
+              strides=(1, 1),
+              name=None):
+    """Utility function to apply conv + BN.
+
+    # Arguments
+        x: input tensor.
+        filters: filters in `Conv2D`.
+        num_row: height of the convolution kernel.
+        num_col: width of the convolution kernel.
+        padding: padding mode in `Conv2D`.
+        strides: strides in `Conv2D`.
+        name: name of the ops; will become `name + '_conv'`
+            for the convolution and `name + '_bn'` for the
+            batch norm layer.
+
+    # Returns
+        Output tensor after applying `Conv2D` and `BatchNormalization`.
+    """
+    if name is not None:
+        bn_name = name + '_bn'
+        conv_name = name + '_conv'
+    else:
+        bn_name = None
+        conv_name = None
+    if image_data_format() == 'channels_first':
+        bn_axis = 1
+    else:
+        bn_axis = 3
+    x = Conv2D(
+        filters, (num_row, num_col),
+        strides=strides,
+        padding=padding,
+        use_bias=False,
+        name=conv_name)(x)
+    x = BatchNormalization(axis=bn_axis, scale=False, name=bn_name)(x)
+    x = Activation('relu', name=name)(x)
+    return x
 
 
 def conv_layer(x, num_filters, kernel, stride=1, padding='same', layer_name="conv"):
@@ -48,7 +92,7 @@ def activation_fn(x, name=None):
 
 
 def batch_normalization_fn(x, name=None):
-    return BatchNormalization(axis=bn_axis, epsilon=eps, name=name)(x)
+    return BatchNormalization(axis=channel_axis, epsilon=eps, name=name)(x)
 
 def dropout_fn(x, rate):
     return Dropout(rate=rate)(x)
@@ -57,13 +101,20 @@ def classifier_fn(layer, num_labels=2, actv='softmax'):
     return Dense(num_labels, activation=actv)(layer)
 
 def concat_fn(layers, name=None):
-    return Concatenate(axis=bn_axis, name=name)(layers)
+    return Concatenate(axis=channel_axis, name=name)(layers)
 
 def load_densenet_model(use_weights):
     weights = 'imagenet' if use_weights == True else None
     base_model = DenseNet121(include_top=False, weights=weights, input_tensor=Input(shape=(224, 224, 3)),
                              input_shape=(224, 224, 3), pooling='avg')
     return base_model
+
+def load_inception_model(use_weights):
+    weights = 'imagenet' if use_weights == True else None
+    base_model = InceptionV3(include_top=False, weights=weights, input_tensor=Input(shape=(224, 224, 3)),
+                             input_shape=(224, 224, 3), pooling='avg')
+    return base_model
+
 
 # Base Model
 class DenseNetBaseModel():
@@ -75,8 +126,8 @@ class DenseNetBaseModel():
     def get_model(self):
         base_model = load_densenet_model(self.use_imagenet_weights)
         classifier = classifier_fn(layer=base_model.get_layer('avg_pool').output, num_labels=self.num_labels, actv='softmax')
-        model = Model(inputs=base_model.input, outputs=classifier)
-        return model
+        # model = Model(inputs=base_model.input, outputs=classifier)
+        return classifier
 
 # Injection pretrained Model
 class DenseNetInceptionConcat():
@@ -116,72 +167,108 @@ class DenseNetInceptionConcat():
 
     def inception_module_A(self, x, scope):
         with tf.name_scope(scope):
-            x = batch_normalization_fn(x)
-            x = activation_fn(x, name=scope)
-            x1 = conv_layer(x, 32, kernel=[1, 1], layer_name=scope + "convX1")
-            x2 = conv_layer(x, 32, kernel=[1, 1], layer_name=scope + "convX2_1")
-            x2 = batch_normalization_fn(x2)
-            x2 = activation_fn(x2)
-            x2 = conv_layer(x2, 32, kernel=[3, 3], layer_name=scope + "convX2_2")
-            x3 = conv_layer(x, 32, kernel=[1, 1], layer_name=scope + "convX3_1")
-            x3 = batch_normalization_fn(x3)
-            x3 = activation_fn(x3)
-            x3 = conv_layer(x3, 48, kernel=[3, 3], layer_name=scope + "convX3_2")
-            x3 = batch_normalization_fn(x3)
-            x3 = activation_fn(x3)
-            x3 = conv_layer(x3, 64, kernel=[3, 3], layer_name=scope + "convX3_3")
-            concat = concat_fn([x1, x2, x3])
-            concat = batch_normalization_fn(concat)
-            concat = activation_fn(concat)
-            x4 = conv_layer(concat, 384, kernel=[1, 1], layer_name=scope + "convX4")
-            # if self.dropout_rate > 0:
-            #     out = tf.layers.dropout(x4, rate=self.dropout_rate, training=self.is_training)
-            out = Average_pooling(x4, pool_size=[2, 2], stride=2, name=scope)
+            branch1x1 = conv2d_bn(x, 96, 1, 1)
+
+            branch5x5 = conv2d_bn(x, 48, 1, 1)
+            branch5x5 = conv2d_bn(branch5x5, 64, 5, 5)
+
+            branch3x3dbl = conv2d_bn(x, 64, 1, 1)
+            branch3x3dbl = conv2d_bn(branch3x3dbl, 96, 3, 3)
+            branch3x3dbl = conv2d_bn(branch3x3dbl, 96, 3, 3)
+
+            branch_pool = Average_pooling(x, pool_size=[2, 2], stride=2)
+
+            branch_pool = conv2d_bn(branch_pool, 64, 1, 1)
+            out = concat_fn([branch1x1, branch5x5, branch3x3dbl, branch_pool])
+            # x = batch_normalization_fn(x)
+            # x = activation_fn(x, name=scope)
+            # x1 = conv_layer(x, 32, kernel=[1, 1], layer_name=scope + "convX1")
+            # x2 = conv_layer(x, 32, kernel=[1, 1], layer_name=scope + "convX2_1")
+            # x2 = batch_normalization_fn(x2)
+            # x2 = activation_fn(x2)
+            # x2 = conv_layer(x2, 32, kernel=[3, 3], layer_name=scope + "convX2_2")
+            # x3 = conv_layer(x, 32, kernel=[1, 1], layer_name=scope + "convX3_1")
+            # x3 = batch_normalization_fn(x3)
+            # x3 = activation_fn(x3)
+            # x3 = conv_layer(x3, 48, kernel=[3, 3], layer_name=scope + "convX3_2")
+            # x3 = batch_normalization_fn(x3)
+            # x3 = activation_fn(x3)
+            # x3 = conv_layer(x3, 64, kernel=[3, 3], layer_name=scope + "convX3_3")
+            # concat = concat_fn([x1, x2, x3])
+            # concat = batch_normalization_fn(concat)
+            # concat = activation_fn(concat)
+            # x4 = conv_layer(concat, 384, kernel=[1, 1], layer_name=scope + "convX4")
+            # # if self.dropout_rate > 0:
+            # #     out = tf.layers.dropout(x4, rate=self.dropout_rate, training=self.is_training)
+            # out = Average_pooling(x4, pool_size=[2, 2], stride=2, name=scope)
 
             return out
 
     def inception_module_B(self, x, scope):
 
         with tf.name_scope(scope):
-            x = batch_normalization_fn(x)
-            x = activation_fn(x)
-            x1 = conv_layer(x, 128, kernel=[1, 1], layer_name=scope + "convX1")
-            x2 = conv_layer(x, 128, kernel=[1, 1], layer_name=scope + "convX2_1")
-            x2 = batch_normalization_fn(x2)
-            x2 = activation_fn(x2)
-            x2 = conv_layer(x2, 128, kernel=[1, 7], layer_name=scope + "convX2_2")
-            x2 = batch_normalization_fn(x2)
-            x2 = activation_fn(x2)
-            x2 = conv_layer(x2, 128, kernel=[7, 1], layer_name=scope + "convX2_3")
-            concat = concat_fn([x1, x2])
-            concat = batch_normalization_fn(concat)
-            concat = activation_fn(concat)
+            branch1x1 = conv2d_bn(x, 128, 1, 1)
 
-            x3 = conv_layer(concat, 896, kernel=[1, 1], layer_name=scope + "convX3")
-            # if self.dropout_rate > 0:
-            #     out = tf.layers.dropout(x3, rate=self.dropout_rate, training=self.is_training)
-            out = Average_pooling(x3, pool_size=[2, 2], stride=2)
+            branch1x7 = conv2d_bn(x, 128, 1, 1)
+            branch1x7 = conv2d_bn(branch1x7, 128, 1, 7)
+            branch1x7 = conv2d_bn(branch1x7, 128, 7, 1)
+
+            branch_pool = Average_pooling(x, pool_size=[2, 2], stride=2)
+            branch_pool = conv2d_bn(branch_pool, 896, 1, 1)
+
+            out = concat_fn([branch1x1, branch1x7, branch_pool])
+
+            # x = batch_normalization_fn(x)
+            # x = activation_fn(x)
+            # x1 = conv_layer(x, 128, kernel=[1, 1], layer_name=scope + "convX1")
+            # x2 = conv_layer(x, 128, kernel=[1, 1], layer_name=scope + "convX2_1")
+            # x2 = batch_normalization_fn(x2)
+            # x2 = activation_fn(x2)
+            # x2 = conv_layer(x2, 128, kernel=[1, 7], layer_name=scope + "convX2_2")
+            # x2 = batch_normalization_fn(x2)
+            # x2 = activation_fn(x2)
+            # x2 = conv_layer(x2, 128, kernel=[7, 1], layer_name=scope + "convX2_3")
+            # concat = concat_fn([x1, x2])
+            # concat = batch_normalization_fn(concat)
+            # concat = activation_fn(concat)
+            #
+            # x3 = conv_layer(concat, 896, kernel=[1, 1], layer_name=scope + "convX3")
+            # # if self.dropout_rate > 0:
+            # #     out = tf.layers.dropout(x3, rate=self.dropout_rate, training=self.is_training)
+            # out = Average_pooling(x3, pool_size=[2, 2], stride=2)
 
             return out
 
     def inception_module_C(self, x, scope):
         with tf.name_scope(scope):
-            x = batch_normalization_fn(x)
-            x = activation_fn(x)
-            x1 = conv_layer(x, 192, kernel=[1, 1], layer_name=scope + "convX1")
-            x2 = conv_layer(x, 192, kernel=[1, 1], layer_name=scope + "convX2_1")
-            x2 = batch_normalization_fn(x2)
-            x2 = activation_fn(x2)
-            x2 = conv_layer(x2, 128, kernel=[1, 3], layer_name=scope + "convX2_2")
-            x2 = batch_normalization_fn(x2)
-            x2 = activation_fn(x2)
-            x2 = conv_layer(x2, 128, kernel=[3, 1], layer_name=scope + "convX2_3")
-            concat = concat_fn([x1, x2])
-            concat = batch_normalization_fn(concat)
-            concat = activation_fn(concat)
 
-            x3 = conv_layer(concat, 1792, kernel=[1, 1], layer_name=scope + "convX3")
-            out = Average_pooling(x3, pool_size=[2, 2], stride=2, name=scope)
+            branch1x1 = conv2d_bn(x, 192, 1, 1)
+
+            branch1x3 = conv2d_bn(x, 192, 1, 1)
+            branch1x3 = conv2d_bn(branch1x3, 128, 1, 3)
+            branch1x3 = conv2d_bn(branch1x3, 128, 3, 1)
+
+            branch_pool = Average_pooling(x, pool_size=[2, 2], stride=2)
+            branch_pool = conv2d_bn(branch_pool, 1792, 1, 1)
+
+            out = concat_fn([branch1x1, branch1x3, branch_pool])
+
+            # x = batch_normalization_fn(x)
+            # x = activation_fn(x)
+            # x1 = conv_layer(x, 192, kernel=[1, 1], layer_name=scope + "convX1")
+            # x2 = conv_layer(x, 192, kernel=[1, 1], layer_name=scope + "convX2_1")
+            # x2 = batch_normalization_fn(x2)
+            # x2 = activation_fn(x2)
+            # x2 = conv_layer(x2, 128, kernel=[1, 3], layer_name=scope + "convX2_2")
+            # x2 = batch_normalization_fn(x2)
+            # x2 = activation_fn(x2)
+            # x2 = conv_layer(x2, 128, kernel=[3, 1], layer_name=scope + "convX2_3")
+            # concat = concat_fn([x1, x2])
+            # concat = batch_normalization_fn(concat)
+            # concat = activation_fn(concat)
+            #
+            # x3 = conv_layer(concat, 1792, kernel=[1, 1], layer_name=scope + "convX3")
+            # out = Average_pooling(x3, pool_size=[2, 2], stride=2, name=scope)
 
             return out
 

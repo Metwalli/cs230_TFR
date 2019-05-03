@@ -144,14 +144,18 @@ class DenseNetInceptionConcat():
 
         block1_output = base_model.get_layer('pool2_relu').output
         incep_a = self.inception_module_A(block1_output, scope="incepA_")
+        incep_a = self.inception_module_A(incep_a, scope="incepA2_")
+        incep_a = Average_pooling(incep_a, pool_size=[2, 2], stride=2)
 
         block2_output = base_model.get_layer('pool3_relu').output
         concat = concat_fn([incep_a, block2_output], name="incepA_output_block2_output")
         incep_b = self.inception_module_B(concat, scope="incepB_")
+        incep_b = Average_pooling(incep_b, pool_size=[2, 2], stride=2)
 
         block3_output = base_model.get_layer('pool4_relu').output
         concat = concat_fn([incep_b, block3_output], name="incepB_output_block3_output")
         incep_c = self.inception_module_C(concat, scope="incepC_")
+        incep_c = Average_pooling(incep_c, pool_size=[2, 2], stride=2)
 
         block4_output = base_model.get_layer('relu').output
         concat = concat_fn(layers=[incep_c, block4_output], name="incepC_output_block4_output")
@@ -170,16 +174,13 @@ class DenseNetInceptionConcat():
             branch1x1 = conv2d_bn(x, 96, 1, 1)
 
             branch5x5 = conv2d_bn(x, 48, 1, 1)
-            branch5x5 = conv2d_bn(branch5x5, 64, 5, 5)
+            branch5x5 = conv2d_bn(branch5x5, 64, 3, 3)
 
             branch3x3dbl = conv2d_bn(x, 64, 1, 1)
             branch3x3dbl = conv2d_bn(branch3x3dbl, 96, 3, 3)
             branch3x3dbl = conv2d_bn(branch3x3dbl, 96, 3, 3)
 
-            branch_pool = Average_pooling(x, pool_size=[2, 2], stride=2)
-
-            branch_pool = conv2d_bn(branch_pool, 64, 1, 1)
-            out = concat_fn([branch1x1, branch5x5, branch3x3dbl, branch_pool])
+            out = concat_fn([branch1x1, branch5x5, branch3x3dbl])
             # x = batch_normalization_fn(x)
             # x = activation_fn(x, name=scope)
             # x1 = conv_layer(x, 32, kernel=[1, 1], layer_name=scope + "convX1")
@@ -213,10 +214,13 @@ class DenseNetInceptionConcat():
             branch1x7 = conv2d_bn(branch1x7, 128, 1, 7)
             branch1x7 = conv2d_bn(branch1x7, 128, 7, 1)
 
-            branch_pool = Average_pooling(x, pool_size=[2, 2], stride=2)
-            branch_pool = conv2d_bn(branch_pool, 896, 1, 1)
+            branch1x7dbl = conv2d_bn(x, 128, 1, 1)
+            branch1x7dbl = conv2d_bn(branch1x7dbl, 128, 1, 7)
+            branch1x7dbl = conv2d_bn(branch1x7dbl, 128, 7, 1)
+            branch1x7dbl = conv2d_bn(branch1x7dbl, 128, 1, 7)
+            branch1x7dbl = conv2d_bn(branch1x7dbl, 128, 7, 1)
 
-            out = concat_fn([branch1x1, branch1x7, branch_pool])
+            out = concat_fn([branch1x1, branch1x7, branch1x7dbl])
 
             # x = batch_normalization_fn(x)
             # x = activation_fn(x)
@@ -245,13 +249,15 @@ class DenseNetInceptionConcat():
             branch1x1 = conv2d_bn(x, 192, 1, 1)
 
             branch1x3 = conv2d_bn(x, 192, 1, 1)
-            branch1x3 = conv2d_bn(branch1x3, 128, 1, 3)
-            branch1x3 = conv2d_bn(branch1x3, 128, 3, 1)
+            branch1x3_1 = conv2d_bn(branch1x3, 128, 1, 3)
+            branch1x3_2 = conv2d_bn(branch1x3, 128, 3, 1)
 
-            branch_pool = Average_pooling(x, pool_size=[2, 2], stride=2)
-            branch_pool = conv2d_bn(branch_pool, 1792, 1, 1)
+            branch3x3 = conv2d_bn(x, 192, 1, 1)
+            branch3x3 = conv2d_bn(branch3x3, 128, 3, 3)
+            branch3x3_1 = conv2d_bn(branch3x3, 128, 1, 3)
+            branch3x3_2 = conv2d_bn(branch3x3, 128, 3, 1)
 
-            out = concat_fn([branch1x1, branch1x3, branch_pool])
+            out = concat_fn([branch1x1, branch1x3_1, branch1x3_2, branch3x3_1, branch3x3_2])
 
             # x = batch_normalization_fn(x)
             # x = activation_fn(x)

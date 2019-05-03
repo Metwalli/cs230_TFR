@@ -126,8 +126,8 @@ class DenseNetBaseModel():
     def get_model(self):
         base_model = load_densenet_model(self.use_imagenet_weights)
         classifier = classifier_fn(layer=base_model.get_layer('avg_pool').output, num_labels=self.num_labels, actv='softmax')
-        # model = Model(inputs=base_model.input, outputs=classifier)
-        return classifier
+        model = Model(inputs=base_model.input, outputs=classifier)
+        return model
 
 # Injection pretrained Model
 class DenseNetInceptionConcat():

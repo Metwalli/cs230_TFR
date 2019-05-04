@@ -5,6 +5,7 @@ import keras
 from keras.optimizers import Adam, RMSprop
 import argparse
 from keras.preprocessing.image import ImageDataGenerator
+from keras.models import load_model
 import os
 import functools
 import numpy as np
@@ -47,7 +48,6 @@ BS = params.batch_size
 model_name = params.model_name
 use_imagenet_weights = False
 
-assert restore_from is not None
 
 # Dataset Directory
 test_dir = os.path.join(data_dir, "test")
@@ -60,26 +60,18 @@ test_generator = test_datagen.flow_from_directory(
         batch_size=BS,
         class_mode='categorical')
 
-CLASSES = test_datagen.num_classes
+CLASSES = test_generator.num_classes
 params.num_labels = CLASSES
 
 # initialize the model
 print ("[INFO] creating model...")
-if model_name == 'base':
-    model = DenseNetBaseModel(CLASSES, use_imagenet_weights).model
-elif model_name == 'inject':
-    model = DenseNetInceptionConcat(num_labels=CLASSES, use_imagenet_weights=use_imagenet_weights).model
-else:
-    model = DenseNetInception(input_shape=IMAGE_DIMS, params=params).model
-
 # Restore Model
-if restore_from is not None:
-    file_path = os.path.join(restore_from, "best.weights.hdf5")
-    model.load_weights(file_path)
+file_path = os.path.join(model_dir, "best.weights.hdf5")
+model = load_model(file_path)
 
-model.evaluate_generator(generator=test_generator)
+model.evaluate_generator(generator=test_generator, steps=test_generator.n // BS)
 test_generator.reset()
-pred = model.predict_generator(test_generator, verbose=1)
+pred = model.predict_generator(test_generator, steps=test_generator.n // BS, verbose=1)
 predicted_class_indices = np.argmax(pred, axis=1)
 
 labels = (test_generator.class_indices)

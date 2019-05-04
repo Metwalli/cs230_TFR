@@ -106,7 +106,7 @@ def concat_fn(layers, name=None):
 def load_densenet_model(use_weights):
     weights = 'imagenet' if use_weights == True else None
     base_model = DenseNet121(include_top=False, weights=weights, input_tensor=Input(shape=(224, 224, 3)),
-                             input_shape=(224, 224, 3))
+                             input_shape=(224, 224, 3), pooling='avg')
     return base_model
 
 def load_inception_model(use_weights):

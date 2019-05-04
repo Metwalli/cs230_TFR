@@ -172,8 +172,13 @@ class DenseNetInceptionConcat():
         # incep_c = self.inception_module_C(concat, scope="incepC_")
         # incep_c = Average_pooling(incep_c, pool_size=[2, 2], stride=2)
 
+        # for layer in tuple(base_model.layers):
+        #     layer.trainable = False
         block4_output = base_model.get_layer('relu').output
-        incep_c = self.inception_module_C(block4_output, scope="incepC_")
+        incep_c = self.inception_module_C(block4_output, scope="incepC1_")
+        # incep_c = self.inception_module_C(incep_c, scope="incepC2_")
+        # incep_c = self.inception_module_C(incep_c, scope="incepC3_")
+
 
         # concat = concat_fn(layers=[incep_c, block4_output], name="incepC_output_block4_output")
 

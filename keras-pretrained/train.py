@@ -20,7 +20,7 @@ import random
 
 # from dense_inception import DenseNetInception
 from tensorboard_wrapper import TensorBoardWrapper
-from dense_inception_concat import DenseNetInceptionConcat, DenseNetBaseModel, DenseNetInception, DenseNetInceptionModel
+from dense_inception_concat import DenseNetInceptionInject, DenseNetBaseModel, DenseNetInceptionResnetModel, InceptionResNetModel
 from utils import Params
 from loss_history import LossHistory
 
@@ -137,12 +137,15 @@ loss_history = LossHistory(history_filename)
 initial_epoch = loss_history.get_initial_epoch()
 EPOCHS += initial_epoch
 if restore_from is None:
-    if model_name == 'base':
+    if model_name == 'densenet':
         model = DenseNetBaseModel(CLASSES, use_imagenet_weights).model
-    elif model_name == 'inject':
-        model = DenseNetInceptionConcat(num_labels=CLASSES, use_imagenet_weights=use_imagenet_weights).model
+    elif model_name == "incep_resnet":
+        model = InceptionResNetModel(num_labels=CLASSES, use_imagenet_weights=use_imagenet_weights)
+    elif model_name == 'concat':
+        model = DenseNetInceptionResnetModel(CLASSES, use_imagenet_weights).model
     else:
-        model = DenseNetInceptionModel(CLASSES, use_imagenet_weights).model
+        model = DenseNetInceptionInject(num_labels=CLASSES, use_imagenet_weights=use_imagenet_weights).model
+
 else:
     # Restore Model
     file_path = os.path.join(restore_from, "best.weights.hdf5")

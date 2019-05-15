@@ -1,11 +1,12 @@
 from __future__ import print_function
 import tensorflow as tf
-from keras.layers import Conv2D, Dense, Flatten, Input, BatchNormalization, \
+from keras.layers import Conv2D, Dense, Flatten, Input, BatchNormalization, ZeroPadding2D, \
     Activation, AveragePooling2D, MaxPooling2D, GlobalAveragePooling2D, Dropout, Concatenate
 from keras.models import Model
 from keras.backend import image_data_format
 from keras.applications.densenet import DenseNet121
 from keras.applications.inception_v3 import InceptionV3
+from keras.applications.inception_resnet_v2 import InceptionResNetV2
 from keras.utils import plot_model
 
 channel_axis = 3 if image_data_format() == 'channels_last' else 1
@@ -106,16 +107,16 @@ def concat_fn(layers, name=None):
 def load_densenet_model(use_weights):
     weights = 'imagenet' if use_weights == True else None
     base_model = DenseNet121(include_top=False, weights=weights, input_tensor=Input(shape=(224, 224, 3)),
-                             input_shape=(224, 224, 3), pooling='avg')
+                             input_shape=(224, 224, 3))
     return base_model
 
-def load_inception_model(use_weights):
+def load_inceptionresnet_model(use_weights):
     weights = 'imagenet' if use_weights == True else None
-    base_model = InceptionV3(include_top=False, weights=weights, input_tensor=Input(shape=(224, 224, 3)),
-                             input_shape=(224, 224, 3), pooling='avg')
+    base_model = InceptionResNetV2(include_top=False, weights=weights, input_tensor=Input(shape=(224, 224, 3)),
+                             input_shape=(224, 224, 3))
     return base_model
 
-class DenseNetInceptionModel():
+class DenseNetInceptionResnetModel():
     def __init__(self, num_labels, use_imagenet_weights=True):
         self.num_labels = num_labels
         self.use_imagenet_weights = use_imagenet_weights
@@ -123,10 +124,12 @@ class DenseNetInceptionModel():
 
     def get_model(self):
         dense_model = load_densenet_model(self.use_imagenet_weights)
-        dense_out = dense_model.layers[-1]
-        inception_model = load_inception_model(self.use_imagenet_weights)
-        inception_out = inception_model.layers[-1]
+        dense_out = dense_model.layers[-1].output
+        inception_model = load_inceptionresnet_model(self.use_imagenet_weights)
+        inception_out = inception_model.layers[-1].output
+        inception_out = ZeroPadding2D(padding=(1, 1), data_format=None)(inception_out)
         out = concat_fn([dense_out, inception_out])
+        out = Global_Average_Pooling(out)
         classifier = classifier_fn(layer=out, num_labels=self.num_labels, actv='softmax')
         model = Model(inputs=[dense_model.input, inception_model.input], outputs=classifier)
         return model
@@ -140,12 +143,28 @@ class DenseNetBaseModel():
 
     def get_model(self):
         base_model = load_densenet_model(self.use_imagenet_weights)
-        classifier = classifier_fn(layer=base_model.get_layer('avg_pool').output, num_labels=self.num_labels, actv='softmax')
+        out = Global_Average_Pooling(base_model.layers[-1].output)
+        classifier = classifier_fn(layer=out, num_labels=self.num_labels, actv='softmax')
         model = Model(inputs=base_model.input, outputs=classifier)
         return model
 
+# InceptionResnet Model
+class InceptionResNetModel():
+    def __init__(self, num_labels, use_imagenet_weights=True):
+        self.num_labels = num_labels
+        self.use_imagenet_weights = use_imagenet_weights
+        self.model = self.get_model()
+
+    def get_model(self):
+        base_model = load_inceptionresnet_model(self.use_imagenet_weights)
+        out = Global_Average_Pooling(base_model.layers[-1].output)
+        classifier = classifier_fn(layer=out, num_labels=self.num_labels, actv='softmax')
+        model = Model(inputs=base_model.input, outputs=classifier)
+        return model
+
+
 # Injection pretrained Model
-class DenseNetInceptionConcat():
+class DenseNetInceptionInject():
     def __init__(self, num_labels, use_imagenet_weights=True):
 
         self.num_labels = num_labels

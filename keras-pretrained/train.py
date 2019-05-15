@@ -20,7 +20,7 @@ import random
 
 # from dense_inception import DenseNetInception
 from tensorboard_wrapper import TensorBoardWrapper
-from dense_inception_concat import DenseNetInceptionConcat, DenseNetBaseModel, DenseNetInception
+from dense_inception_concat import DenseNetInceptionConcat, DenseNetBaseModel, DenseNetInception, DenseNetInceptionModel
 from utils import Params
 from loss_history import LossHistory
 
@@ -97,7 +97,7 @@ if data_dir is None:
 
 # Dataset Directory
 train_dir = os.path.join(data_dir, "train")
-valid_dir = os.path.join(data_dir, "test")
+valid_dir = os.path.join(data_dir, "eval")
 train_datagen = ImageDataGenerator(rotation_range=25,
                                    width_shift_range=0.1,
                                    rescale=1./255,
@@ -142,7 +142,7 @@ if restore_from is None:
     elif model_name == 'inject':
         model = DenseNetInceptionConcat(num_labels=CLASSES, use_imagenet_weights=use_imagenet_weights).model
     else:
-        model = DenseNetInception(input_shape=IMAGE_DIMS, params=params).model
+        model = DenseNetInceptionModel(CLASSES, use_imagenet_weights).model
 else:
     # Restore Model
     file_path = os.path.join(restore_from, "best.weights.hdf5")
@@ -152,12 +152,10 @@ else:
 
 # Initial checkpoints and Tensorboard to monitor training
 
-
-
 print("[INFO] compiling model...")
 opt = Adam(lr=INIT_LR, decay=INIT_LR / EPOCHS)
 model.compile(loss="categorical_crossentropy", optimizer=opt,
-              metrics=["accuracy"])
+              metrics=["accuracy", "top_k_categorical_accuracy"])
 
 
 tensorBoard = TensorBoard(log_dir=os.path.join(model_dir, 'logs/{}'.format(time.time())), write_images=True)

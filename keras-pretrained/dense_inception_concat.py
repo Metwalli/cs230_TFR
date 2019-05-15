@@ -157,32 +157,32 @@ class DenseNetInceptionConcat():
 
         base_model = load_densenet_model(self.use_imagenet_weights)
 
-        # block1_output = base_model.get_layer('pool2_relu').output
-        # incep_a = self.inception_module_A(block1_output, scope="incepA_")
+        block1_output = base_model.get_layer('pool2_relu').output
+        incep_a = self.inception_module_A(block1_output, scope="incepA_")
         # incep_a = self.inception_module_A(incep_a, scope="incepA2_")
         # incep_a = Average_pooling(incep_a, pool_size=[2, 2], stride=2)
         #
-        # block2_output = base_model.get_layer('pool3_relu').output
-        # concat = concat_fn([incep_a, block2_output], name="incepA_output_block2_output")
-        # incep_b = self.inception_module_B(concat, scope="incepB_")
+        block2_output = base_model.get_layer('pool3_relu').output
+        concat = concat_fn([incep_a, block2_output], name="incepA_output_block2_output")
+        incep_b = self.inception_module_B(concat, scope="incepB_")
         # incep_b = Average_pooling(incep_b, pool_size=[2, 2], stride=2)
         #
-        # block3_output = base_model.get_layer('pool4_relu').output
-        # concat = concat_fn([incep_b, block3_output], name="incepB_output_block3_output")
-        # incep_c = self.inception_module_C(concat, scope="incepC_")
+        block3_output = base_model.get_layer('pool4_relu').output
+        concat = concat_fn([incep_b, block3_output], name="incepB_output_block3_output")
+        incep_c = self.inception_module_C(concat, scope="incepC_")
         # incep_c = Average_pooling(incep_c, pool_size=[2, 2], stride=2)
 
         # for layer in tuple(base_model.layers):
         #     layer.trainable = False
         block4_output = base_model.get_layer('relu').output
-        incep_c = self.inception_module_C(block4_output, scope="incepC1_")
+        # incep_c = self.inception_module_C(block4_output, scope="incepC1_")
         # incep_c = self.inception_module_C(incep_c, scope="incepC2_")
         # incep_c = self.inception_module_C(incep_c, scope="incepC3_")
 
 
-        # concat = concat_fn(layers=[incep_c, block4_output], name="incepC_output_block4_output")
+        concat = concat_fn(layers=[incep_c, block4_output], name="incepC_output_block4_output")
 
-        out = Global_Average_Pooling(incep_c)
+        out = Global_Average_Pooling(concat)
 
         with tf.variable_scope('fc_2'):
             classifier = classifier_fn(layer=out, num_labels=self.num_labels, actv='softmax')
@@ -193,16 +193,33 @@ class DenseNetInceptionConcat():
 
     def inception_module_A(self, x, scope):
         with tf.name_scope(scope):
+            # mixed 3: 17 x 17 x 768
+            branch3x3 = conv2d_bn(x, 384, 3, 3, strides=(2, 2), padding='same')
+
+            branch3x3dbl = conv2d_bn(x, 64, 1, 1)
+            branch3x3dbl = conv2d_bn(branch3x3dbl, 96, 3, 3)
+            branch3x3dbl = conv2d_bn(
+                branch3x3dbl, 96, 3, 3, strides=(2, 2), padding='same')
+
+            branch_pool = MaxPooling2D((3, 3), strides=(2, 2), padding='same')(x)
+
+            x = concat_fn([branch3x3, branch3x3dbl, branch_pool])
+
             branch1x1 = conv2d_bn(x, 96, 1, 1)
 
             branch5x5 = conv2d_bn(x, 48, 1, 1)
-            branch5x5 = conv2d_bn(branch5x5, 64, 3, 3)
+            branch5x5 = conv2d_bn(branch5x5, 64, 5, 5)
 
             branch3x3dbl = conv2d_bn(x, 64, 1, 1)
             branch3x3dbl = conv2d_bn(branch3x3dbl, 96, 3, 3)
             branch3x3dbl = conv2d_bn(branch3x3dbl, 96, 3, 3)
 
-            out = concat_fn([branch1x1, branch5x5, branch3x3dbl])
+            branch_pool = AveragePooling2D((3, 3),
+                                                  strides=(1, 1),
+                                                  padding='same')(x)
+            branch_pool = conv2d_bn(branch_pool, 32, 1, 1)
+
+            out = concat_fn([branch1x1, branch5x5, branch3x3dbl, branch_pool])
             # x = batch_normalization_fn(x)
             # x = activation_fn(x, name=scope)
             # x1 = conv_layer(x, 32, kernel=[1, 1], layer_name=scope + "convX1")
@@ -230,19 +247,37 @@ class DenseNetInceptionConcat():
     def inception_module_B(self, x, scope):
 
         with tf.name_scope(scope):
-            branch1x1 = conv2d_bn(x, 128, 1, 1)
+            # mixed 3: 17 x 17 x 768
+            branch3x3 = conv2d_bn(x, 384, 3, 3, strides=(2, 2), padding='same')
 
-            branch1x7 = conv2d_bn(x, 128, 1, 1)
-            branch1x7 = conv2d_bn(branch1x7, 128, 1, 7)
-            branch1x7 = conv2d_bn(branch1x7, 128, 7, 1)
+            branch3x3dbl = conv2d_bn(x, 64, 1, 1)
+            branch3x3dbl = conv2d_bn(branch3x3dbl, 96, 3, 3)
+            branch3x3dbl = conv2d_bn(
+                branch3x3dbl, 96, 3, 3, strides=(2, 2), padding='same')
 
-            branch1x7dbl = conv2d_bn(x, 128, 1, 1)
-            branch1x7dbl = conv2d_bn(branch1x7dbl, 128, 1, 7)
-            branch1x7dbl = conv2d_bn(branch1x7dbl, 128, 7, 1)
-            branch1x7dbl = conv2d_bn(branch1x7dbl, 128, 1, 7)
-            branch1x7dbl = conv2d_bn(branch1x7dbl, 128, 7, 1)
+            branch_pool = MaxPooling2D((3, 3), strides=(2, 2), padding='same')(x)
 
-            out = concat_fn([branch1x1, branch1x7, branch1x7dbl])
+            x = concat_fn([branch3x3, branch3x3dbl, branch_pool])
+
+            # mixed 4: 17 x 17 x 768
+            branch1x1 = conv2d_bn(x, 192, 1, 1)
+
+            branch7x7 = conv2d_bn(x, 128, 1, 1)
+            branch7x7 = conv2d_bn(branch7x7, 128, 1, 7)
+            branch7x7 = conv2d_bn(branch7x7, 192, 7, 1)
+
+            branch7x7dbl = conv2d_bn(x, 128, 1, 1)
+            branch7x7dbl = conv2d_bn(branch7x7dbl, 128, 7, 1)
+            branch7x7dbl = conv2d_bn(branch7x7dbl, 128, 1, 7)
+            branch7x7dbl = conv2d_bn(branch7x7dbl, 128, 7, 1)
+            branch7x7dbl = conv2d_bn(branch7x7dbl, 192, 1, 7)
+
+            branch_pool = AveragePooling2D((3, 3),
+                                                  strides=(1, 1),
+                                                  padding='same')(x)
+            branch_pool = conv2d_bn(branch_pool, 192, 1, 1)
+
+            out = concat_fn([branch1x1, branch7x7, branch7x7dbl, branch_pool])
 
             # x = batch_normalization_fn(x)
             # x = activation_fn(x)
@@ -267,7 +302,22 @@ class DenseNetInceptionConcat():
 
     def inception_module_C(self, x, scope):
         with tf.name_scope(scope):
+            # mixed 8: 8 x 8 x 1280
+            branch3x3 = conv2d_bn(x, 192, 1, 1)
+            branch3x3 = conv2d_bn(branch3x3, 320, 3, 3,
+                                  strides=(2, 2), padding='same')
 
+            branch7x7x3 = conv2d_bn(x, 192, 1, 1)
+            branch7x7x3 = conv2d_bn(branch7x7x3, 192, 1, 7)
+            branch7x7x3 = conv2d_bn(branch7x7x3, 192, 7, 1)
+            branch7x7x3 = conv2d_bn(
+                branch7x7x3, 192, 3, 3, strides=(2, 2), padding='same')
+
+            branch_pool = MaxPooling2D((3, 3), strides=(2, 2), padding='same')(x)
+
+            x = concat_fn([branch3x3, branch7x7x3, branch_pool])
+
+            # mixed 8: 8 x 8 x 1280
             branch1x1 = conv2d_bn(x, 192, 1, 1)
 
             branch1x3 = conv2d_bn(x, 192, 1, 1)

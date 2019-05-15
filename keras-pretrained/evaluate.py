@@ -11,7 +11,6 @@ import functools
 import numpy as np
 import pandas as pd
 # from dense_inception import DenseNetInception
-from dense_inception_concat import DenseNetInceptionConcat, DenseNetBaseModel, DenseNetInception
 from utils import Params
 # import pickle
 # import seaborn as sns
@@ -66,17 +65,31 @@ params.num_labels = CLASSES
 # initialize the model
 print ("[INFO] creating model...")
 # Restore Model
-file_path = os.path.join(model_dir, "best.weights.hdf5")
+file_path = os.path.join(model_dir, "checkpoints/best.weights.hdf5")
 model = load_model(file_path)
 
 model.evaluate_generator(generator=test_generator, steps=test_generator.n // BS)
 test_generator.reset()
-pred = model.predict_generator(test_generator, steps=test_generator.n // BS, verbose=1)
-predicted_class_indices = np.argmax(pred, axis=1)
+preds = model.predict_generator(test_generator, steps=test_generator.n // BS, verbose=1)
+predicted_class_indices = np.argmax(preds, axis=1)
 
 labels = (test_generator.class_indices)
 labels = dict((v, k) for k, v in labels.items())
 predictions = [labels[k] for k in predicted_class_indices]
+
+# Calculate top-1 and top-5 predictions
+top1 = 0.0
+top5 = 0.0
+for i, l in enumerate(test_generator.labels):
+    pred = preds[i]
+    top_values = (-pred).argsort()[:5]
+    if top_values[0] == l:
+        top1 += 1.0
+    if np.isin(np.array([l]), top_values):
+        top5 += 1.0
+
+print("top1 acc", top1/float(len(labels)))
+print("top5 acc", top5/float(len(labels)))
 
 filenames = test_generator.filenames
 results = pd.DataFrame({"Filename": filenames,

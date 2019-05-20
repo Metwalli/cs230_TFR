@@ -140,7 +140,7 @@ if restore_from is None:
     if model_name == 'densenet':
         model = DenseNetBaseModel(CLASSES, use_imagenet_weights).model
     elif model_name == "incep_resnet":
-        model = InceptionResNetModel(num_labels=CLASSES, use_imagenet_weights=use_imagenet_weights)
+        model = InceptionResNetModel(num_labels=CLASSES, use_imagenet_weights=use_imagenet_weights).model
     elif model_name == 'concat':
         model = DenseNetInceptionResnetModel(CLASSES, use_imagenet_weights).model
     else:

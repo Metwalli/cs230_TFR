@@ -98,6 +98,9 @@ def batch_normalization_fn(x, name=None):
 def dropout_fn(x, rate):
     return Dropout(rate=rate)(x)
 
+def dense_fn(layer, filters=100):
+    return Dense(filters)(layer)
+
 def classifier_fn(layer, num_labels=2, actv='softmax'):
     return Dense(num_labels, activation=actv)(layer)
 
@@ -107,13 +110,13 @@ def concat_fn(layers, name=None):
 def load_densenet_model(use_weights):
     weights = 'imagenet' if use_weights == True else None
     base_model = DenseNet121(include_top=False, weights=weights, input_tensor=Input(shape=(224, 224, 3)),
-                             input_shape=(224, 224, 3))
+                             input_shape=(224, 224, 3), pooling='avg')
     return base_model
 
 def load_inceptionresnet_model(use_weights):
     weights = 'imagenet' if use_weights == True else None
     base_model = InceptionResNetV2(include_top=False, weights=weights, input_tensor=Input(shape=(224, 224, 3)),
-                             input_shape=(224, 224, 3))
+                             input_shape=(224, 224, 3), pooling='avg')
     return base_model
 
 class DenseNetInceptionResnetModel():
@@ -127,9 +130,7 @@ class DenseNetInceptionResnetModel():
         dense_out = dense_model.layers[-1].output
         inception_model = load_inceptionresnet_model(self.use_imagenet_weights)
         inception_out = inception_model.layers[-1].output
-        inception_out = ZeroPadding2D(padding=(1, 1), data_format=None)(inception_out)
-        out = concat_fn([dense_out, inception_out])
-        out = Global_Average_Pooling(out)
+        out = Concatenate(axis=1, name='densenet_incepresnet_concat')([dense_out, inception_out])
         classifier = classifier_fn(layer=out, num_labels=self.num_labels, actv='softmax')
         model = Model(inputs=[dense_model.input, inception_model.input], outputs=classifier)
         return model
@@ -157,11 +158,59 @@ class InceptionResNetModel():
 
     def get_model(self):
         base_model = load_inceptionresnet_model(self.use_imagenet_weights)
-        out = Global_Average_Pooling(base_model.layers[-1].output)
+        out = base_model.layers[-1].output
         classifier = classifier_fn(layer=out, num_labels=self.num_labels, actv='softmax')
         model = Model(inputs=base_model.input, outputs=classifier)
         return model
 
+class DensenetWISeRModel():
+    def __init__(self, num_labels, use_imagenet_weights=True):
+        self.num_labels = num_labels
+        self.use_imagenet_weights = use_imagenet_weights
+        self.model = self.get_model()
+
+    def get_model(self):
+        dense_model = load_densenet_model(self.use_imagenet_weights)
+        densenet_out = dense_model.layers[-1].output
+
+        # Add Slice Branch
+        slice_input = Input(shape=(224, 224, 3))
+        x = conv2d_bn(slice_input, 320, 224, 5, 'valid')
+        x = Max_Pooling(x=x, pool_size=[1, 5], stride=3, padding='valid', name=None)
+        slice_out = Flatten()(x)
+
+        # combine densenet with Slice Branch
+        out = concat_fn([densenet_out, slice_out])
+        out = dense_fn(out, 2048)
+        out = dense_fn(out, 2048)
+        classifier = classifier_fn(layer=out, num_labels=self.num_labels, actv='softmax')
+        model = Model(inputs=[dense_model.input, slice_input], outputs=classifier)
+        return model
+
+# improve DenseWISeR model by increase the width of slice branch
+class DensenetWISeR_Impreved_Model():
+    def __init__(self, num_labels, use_imagenet_weights=True):
+        self.num_labels = num_labels
+        self.use_imagenet_weights = use_imagenet_weights
+        self.model = self.get_model()
+
+    def get_model(self):
+        dense_model = load_densenet_model(self.use_imagenet_weights)
+        densenet_out = dense_model.layers[-1].output
+
+        # Add Slice Branch
+        slice_input = Input(shape=(224, 224, 3))
+        x = conv2d_bn(slice_input, 320, 215, 5, 'valid')
+        x = Max_Pooling(x=x, pool_size=[1, 5], stride=(1,3), padding='valid', name=None)
+        slice_out = Flatten()(x)
+
+        # combine densenet with Slice Branch
+        out = concat_fn([densenet_out, slice_out])
+        out = dense_fn(out, 2048)
+        out = dense_fn(out, 2048)
+        classifier = classifier_fn(layer=out, num_labels=self.num_labels, actv='softmax')
+        model = Model(inputs=[dense_model.input, slice_input], outputs=classifier)
+        return model
 
 # Injection pretrained Model
 class DenseNetInceptionInject():

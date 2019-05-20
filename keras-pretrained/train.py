@@ -20,7 +20,8 @@ import random
 
 # from dense_inception import DenseNetInception
 from tensorboard_wrapper import TensorBoardWrapper
-from dense_inception_concat import DenseNetInceptionInject, DenseNetBaseModel, DenseNetInceptionResnetModel, InceptionResNetModel
+from dense_inception_concat import DenseNetInceptionInject, DenseNetBaseModel, DenseNetInceptionResnetModel,\
+    InceptionResNetModel, DensenetWISeRModel, DensenetWISeR_Impreved_Model
 from utils import Params
 from loss_history import LossHistory
 
@@ -143,6 +144,10 @@ if restore_from is None:
         model = InceptionResNetModel(num_labels=CLASSES, use_imagenet_weights=use_imagenet_weights).model
     elif model_name == 'concat':
         model = DenseNetInceptionResnetModel(CLASSES, use_imagenet_weights).model
+    elif model_name == 'wiser':
+        model = DensenetWISeRModel(CLASSES, use_imagenet_weights).model
+    elif model_name == 'wiser_improve':
+        model = DensenetWISeR_Impreved_Model(CLASSES, use_imagenet_weights).model
     else:
         model = DenseNetInceptionInject(num_labels=CLASSES, use_imagenet_weights=use_imagenet_weights).model
 

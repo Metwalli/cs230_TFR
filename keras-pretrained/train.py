@@ -21,7 +21,7 @@ import random
 # from dense_inception import DenseNetInception
 from tensorboard_wrapper import TensorBoardWrapper
 from dense_inception_concat import DenseNetInceptionInject, DenseNetBaseModel, DenseNetInceptionResnetModel,\
-    InceptionResNetModel, DensenetWISeRModel, DensenetWISeR_Impreved_Model
+    InceptionResNetModel, DensenetWISeRModel, DensenetWISeR_Impreved_Model, DenseNetDenseInception
 from utils import Params
 from loss_history import LossHistory
 
@@ -192,6 +192,8 @@ if restore_from is None:
         model = DensenetWISeRModel(CLASSES, use_imagenet_weights).model
     elif model_name == 'wiser_improve':
         model = DensenetWISeR_Impreved_Model(CLASSES, use_imagenet_weights).model
+    elif model_name == 'dense_incep':
+        model = DenseNetDenseInception(params).model
     else:
         model = DenseNetInceptionInject(num_labels=CLASSES, use_imagenet_weights=use_imagenet_weights).model
 

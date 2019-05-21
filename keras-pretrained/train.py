@@ -82,7 +82,8 @@ params = Params(os.path.join(model_dir, 'params.json'))
 EPOCHS = params.num_epochs
 INIT_LR = params.learning_rate
 BS = params.batch_size
-IMAGE_DIMS = (params.image_size, params.image_size, 3)
+INPUT1_DIMS = (params.image1_size, params.image1_size, 3)
+INPUT2_DIMS = (params.image2_size, params.image2_size, 3)
 seed      = 2019
 results     = params.results_path
 classifier_path = params.classifier_path
@@ -110,28 +111,28 @@ train_datagen = ImageDataGenerator(rotation_range=25,
 
 single_train_generator = train_datagen.flow_from_directory(
         train_dir,
-        target_size=(IMAGE_DIMS[1], IMAGE_DIMS[1]),
+        target_size=(INPUT1_DIMS[1], INPUT1_DIMS[1]),
         batch_size=BS,
         class_mode='categorical')
 
 test_datagen = ImageDataGenerator(rescale=1./255)
 single_validation_generator = test_datagen.flow_from_directory(
         valid_dir,
-        target_size=(IMAGE_DIMS[1], IMAGE_DIMS[1]),
+        target_size=(INPUT1_DIMS[1], INPUT1_DIMS[1]),
         batch_size=BS,
         class_mode='categorical')
 
 
-def generate_generator_multiple(generator, dir1, dir2, batch_size, img_height, img_width):
+def generate_generator_multiple(generator, dir1, dir2, batch_size, img_height1, img_width1, img_height2=224, img_width2=224):
     genX1 = generator.flow_from_directory(dir1,
-                                          target_size=(img_height, img_width),
+                                          target_size=(img_height1, img_width1),
                                           class_mode='categorical',
                                           batch_size=batch_size,
                                           shuffle=False,
                                           seed=7)
 
     genX2 = generator.flow_from_directory(dir2,
-                                          target_size=(img_height, img_width),
+                                          target_size=(img_height2, img_width2),
                                           class_mode='categorical',
                                           batch_size=batch_size,
                                           shuffle=False,
@@ -144,18 +145,23 @@ def generate_generator_multiple(generator, dir1, dir2, batch_size, img_height, i
 
 
 multi_train_generator = generate_generator_multiple(generator=train_datagen,
+                                            dir1=train_dir,
+                                            dir2=train_dir,
+                                            batch_size=BS,
+                                            img_height1=INPUT1_DIMS[1],
+                                            img_width1=INPUT1_DIMS[1],
+                                            img_height2=INPUT2_DIMS[1],
+                                            img_width2=INPUT2_DIMS[1])
+
+multi_validation_generator = generate_generator_multiple(test_datagen,
                                              dir1=train_dir,
                                              dir2=train_dir,
                                              batch_size=BS,
-                                             img_height=IMAGE_DIMS[1],
-                                             img_width=IMAGE_DIMS[1])
+                                             img_height1=INPUT1_DIMS[1],
+                                             img_width1=INPUT1_DIMS[1],
+                                             img_height2=INPUT2_DIMS[1],
+                                             img_width2=INPUT2_DIMS[1])
 
-multi_validation_generator = generate_generator_multiple(test_datagen,
-                                            dir1=valid_dir,
-                                            dir2=valid_dir,
-                                            batch_size=BS,
-                                            img_height=IMAGE_DIMS[1],
-                                            img_width=IMAGE_DIMS[1])
 # grab the test image paths and randomly shuffle them
 # imagePaths = sorted(list(paths.list_images(os.path.join(data_dir, "test"))))
 # random.seed(42)
@@ -217,6 +223,7 @@ last_checkpoint = ModelCheckpoint(os.path.join(model_dir, "checkpoints", "last.w
                                   verbose=1, mode='max')
 
 print("[INFO] training started...")
+'''
 # Train Multiple Inputs
 history = model.fit_generator(
         multi_train_generator,
@@ -238,7 +245,7 @@ history = model.fit_generator(
         validation_data=single_validation_generator,
         validation_steps=single_validation_generator.n // BS,
         callbacks=[best_checkpoint, last_checkpoint, loss_history, tensorBoard])
-'''
+
 # save the model to disk
 print("Saved model to disk")
 model.save(os.path.join(model_dir,  "checkpoints", "last.weights.hdf5"))

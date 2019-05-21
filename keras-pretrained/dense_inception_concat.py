@@ -144,7 +144,7 @@ class DenseNetBaseModel():
 
     def get_model(self):
         base_model = load_densenet_model(self.use_imagenet_weights)
-        out = Global_Average_Pooling(base_model.layers[-1].output)
+        out = base_model.layers[-1].output
         classifier = classifier_fn(layer=out, num_labels=self.num_labels, actv='softmax')
         model = Model(inputs=base_model.input, outputs=classifier)
         return model
@@ -417,6 +417,184 @@ class DenseNetInceptionInject():
             # out = Average_pooling(x3, pool_size=[2, 2], stride=2, name=scope)
 
             return out
+
+#
+class DenseNetDenseInception():
+    def __init__(self, params):
+        self.dropout_rate = params.dropout_rate
+        self.compression_rate = params.compression_rate,
+        self.num_layers_per_block = params.num_layers_per_block
+        self.growth_rate = params.growth_rate
+        self.num_filters = params.num_filters
+        self.num_labels = params.num_labels
+        self.use_imagenet_weights = params.use_imagenet_weights
+
+        self.model = self.Dense_net()
+
+    def Dense_net(self):
+
+        base_model = load_densenet_model(self.use_imagenet_weights)
+
+        block1_output = base_model.get_layer('pool2_relu').output
+        out = self.dense_block(input_x=block1_output, nb_layers=self.num_layers_per_block[0], layer_name='dense_1')
+        out = self.inception_module_A(out, scope="incepA_")
+        if self.dropout_rate > 0:
+            out = dropout_fn(out, rate=self.dropout_rate)
+
+        block2_output = base_model.get_layer('pool3_relu').output
+        out = concat_fn([out, block2_output], name="incepA_output_block2_output")
+        out = self.dense_block(input_x=out, nb_layers=self.num_layers_per_block[1], layer_name='dense_2')
+        out = self.inception_module_B(out, scope="incepB_")
+        if self.dropout_rate > 0:
+            out = dropout_fn(out, rate=self.dropout_rate)
+
+        block3_output = base_model.get_layer('pool4_relu').output
+        out = concat_fn([out, block3_output], name="incepB_output_block3_output")
+        out = self.dense_block(input_x=out, nb_layers=self.num_layers_per_block[2], layer_name='dense_3')
+        out = self.inception_module_C(out, scope="incepC_")
+        if self.dropout_rate > 0:
+            out = dropout_fn(out, rate=self.dropout_rate)
+
+        densenet_out = base_model.layers[-1].output
+        out = concat_fn(layers=[out, densenet_out], axis=1, name="densenet_out_denseinception_output")
+        out = Global_Average_Pooling(out)
+
+        with tf.variable_scope('fc_2'):
+            classifier = classifier_fn(layer=out, num_labels=self.num_labels, actv='softmax')
+        model = Model(inputs=base_model.input, outputs=classifier)
+
+        return model
+
+
+    def inception_module_A(self, x, scope):
+        with tf.name_scope(scope):
+            # mixed 3: 17 x 17 x 768
+            branch3x3 = conv2d_bn(x, 384, 3, 3, strides=(2, 2), padding='same')
+
+            branch3x3dbl = conv2d_bn(x, 64, 1, 1)
+            branch3x3dbl = conv2d_bn(branch3x3dbl, 96, 3, 3)
+            branch3x3dbl = conv2d_bn(
+                branch3x3dbl, 96, 3, 3, strides=(2, 2), padding='same')
+
+            branch_pool = MaxPooling2D((3, 3), strides=(2, 2), padding='same')(x)
+
+            x = concat_fn([branch3x3, branch3x3dbl, branch_pool])
+
+            branch1x1 = conv2d_bn(x, 96, 1, 1)
+
+            branch5x5 = conv2d_bn(x, 48, 1, 1)
+            branch5x5 = conv2d_bn(branch5x5, 64, 5, 5)
+
+            branch3x3dbl = conv2d_bn(x, 64, 1, 1)
+            branch3x3dbl = conv2d_bn(branch3x3dbl, 96, 3, 3)
+            branch3x3dbl = conv2d_bn(branch3x3dbl, 96, 3, 3)
+
+            branch_pool = AveragePooling2D((3, 3),
+                                                  strides=(1, 1),
+                                                  padding='same')(x)
+            branch_pool = conv2d_bn(branch_pool, 32, 1, 1)
+
+            out = concat_fn([branch1x1, branch5x5, branch3x3dbl, branch_pool])
+
+            return out
+
+    def inception_module_B(self, x, scope):
+
+        with tf.name_scope(scope):
+            # mixed 3: 17 x 17 x 768
+            branch3x3 = conv2d_bn(x, 384, 3, 3, strides=(2, 2), padding='same')
+
+            branch3x3dbl = conv2d_bn(x, 64, 1, 1)
+            branch3x3dbl = conv2d_bn(branch3x3dbl, 96, 3, 3)
+            branch3x3dbl = conv2d_bn(
+                branch3x3dbl, 96, 3, 3, strides=(2, 2), padding='same')
+
+            branch_pool = MaxPooling2D((3, 3), strides=(2, 2), padding='same')(x)
+
+            x = concat_fn([branch3x3, branch3x3dbl, branch_pool])
+
+            # mixed 4: 17 x 17 x 768
+            branch1x1 = conv2d_bn(x, 192, 1, 1)
+
+            branch7x7 = conv2d_bn(x, 128, 1, 1)
+            branch7x7 = conv2d_bn(branch7x7, 128, 1, 7)
+            branch7x7 = conv2d_bn(branch7x7, 192, 7, 1)
+
+            branch7x7dbl = conv2d_bn(x, 128, 1, 1)
+            branch7x7dbl = conv2d_bn(branch7x7dbl, 128, 7, 1)
+            branch7x7dbl = conv2d_bn(branch7x7dbl, 128, 1, 7)
+            branch7x7dbl = conv2d_bn(branch7x7dbl, 128, 7, 1)
+            branch7x7dbl = conv2d_bn(branch7x7dbl, 192, 1, 7)
+
+            branch_pool = AveragePooling2D((3, 3),
+                                                  strides=(1, 1),
+                                                  padding='same')(x)
+            branch_pool = conv2d_bn(branch_pool, 192, 1, 1)
+
+            out = concat_fn([branch1x1, branch7x7, branch7x7dbl, branch_pool])
+
+
+            return out
+
+    def inception_module_C(self, x, scope):
+        with tf.name_scope(scope):
+            # mixed 8: 8 x 8 x 1280
+            branch3x3 = conv2d_bn(x, 192, 1, 1)
+            branch3x3 = conv2d_bn(branch3x3, 320, 3, 3,
+                                  strides=(2, 2), padding='same')
+
+            branch7x7x3 = conv2d_bn(x, 192, 1, 1)
+            branch7x7x3 = conv2d_bn(branch7x7x3, 192, 1, 7)
+            branch7x7x3 = conv2d_bn(branch7x7x3, 192, 7, 1)
+            branch7x7x3 = conv2d_bn(
+                branch7x7x3, 192, 3, 3, strides=(2, 2), padding='same')
+
+            branch_pool = MaxPooling2D((3, 3), strides=(2, 2), padding='same')(x)
+
+            x = concat_fn([branch3x3, branch7x7x3, branch_pool])
+
+            # mixed 8: 8 x 8 x 1280
+            branch1x1 = conv2d_bn(x, 192, 1, 1)
+
+            branch1x3 = conv2d_bn(x, 192, 1, 1)
+            branch1x3_1 = conv2d_bn(branch1x3, 128, 1, 3)
+            branch1x3_2 = conv2d_bn(branch1x3, 128, 3, 1)
+
+            branch3x3 = conv2d_bn(x, 192, 1, 1)
+            branch3x3 = conv2d_bn(branch3x3, 128, 3, 3)
+            branch3x3_1 = conv2d_bn(branch3x3, 128, 1, 3)
+            branch3x3_2 = conv2d_bn(branch3x3, 128, 3, 1)
+
+            out = concat_fn([branch1x1, branch1x3_1, branch1x3_2, branch3x3_1, branch3x3_2])
+
+            return out
+
+    def bottleneck_layer(self, x, no_filters, scope):
+        with tf.name_scope(scope):
+            num_channels = no_filters * 4
+            x = conv2d_bn(x, filters=num_channels, num_row=1, num_col=1)
+            if self.dropout_rate > 0:
+                x = dropout_fn(x, rate=self.dropout_rate)
+
+            x = conv2d_bn(x, filters=no_filters, num_row=1, num_col=1)
+            if self.dropout_rate > 0:
+                x = dropout_fn(x, rate=self.dropout_rate)
+
+            return x
+
+    def dense_block(self, input_x, nb_layers, layer_name):
+        with tf.name_scope(layer_name):
+            concat_feat = input_x
+            for i in range(nb_layers):
+                x = self.bottleneck_layer(concat_feat, no_filters=self.growth_rate,
+                                          scope=layer_name + '_bottleN_' + str(i + 1))
+                concat_feat = concat_fn([concat_feat, x])
+
+            #                 self.num_filters += self.growth_rate
+
+            return concat_feat
+
+
 
 # DenseInception Model
 

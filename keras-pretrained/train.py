@@ -48,7 +48,7 @@ def load_dataset(imagePaths):
     for imagePath in imagePaths:
         # load the image, pre-process it, and store it in the data list
         image = cv2.imread(imagePath)
-        image = cv2.resize(image, (IMAGE_DIMS[1], IMAGE_DIMS[0]))
+        image = cv2.resize(image, (INPUT1_DIMS[1], INPUT1_DIMS[0]))
         image = img_to_array(image)
         data.append(image)
         # extract the class label from the image path and update the
@@ -91,6 +91,7 @@ model_path = params.model_path
 model_name = params.model_name
 use_imagenet_weights = params.use_imagenet_weights
 save_period_step = params.save_period_step
+num_inputs = params.num_inputs
 history_filename = os.path.join(model_dir, "train_fit_history.json")
 
 if data_dir is None:
@@ -223,28 +224,28 @@ last_checkpoint = ModelCheckpoint(os.path.join(model_dir, "checkpoints", "last.w
                                   verbose=1, mode='max')
 
 print("[INFO] training started...")
-'''
-# Train Multiple Inputs
-history = model.fit_generator(
-        multi_train_generator,
-        steps_per_epoch=single_train_generator.n // BS,
-        initial_epoch=initial_epoch,
-        epochs=EPOCHS,
-        validation_data=multi_train_generator,
-        validation_steps=single_validation_generator.n // BS,
-        callbacks=[best_checkpoint, last_checkpoint, loss_history, tensorBoard])
+if num_inputs > 1:
+    # Train Multiple Inputs
+    history = model.fit_generator(
+            multi_train_generator,
+            steps_per_epoch=single_train_generator.n // BS,
+            initial_epoch=initial_epoch,
+            epochs=EPOCHS,
+            validation_data=multi_train_generator,
+            validation_steps=single_validation_generator.n // BS,
+            callbacks=[best_checkpoint, last_checkpoint, loss_history, tensorBoard])
 
-'''
-# Train Single Input
+else:
+    # Train Single Input
 
-history = model.fit_generator(
-        single_train_generator,
-        steps_per_epoch=single_train_generator.n // BS,
-        initial_epoch=initial_epoch,
-        epochs=EPOCHS,
-        validation_data=single_validation_generator,
-        validation_steps=single_validation_generator.n // BS,
-        callbacks=[best_checkpoint, last_checkpoint, loss_history, tensorBoard])
+    history = model.fit_generator(
+            single_train_generator,
+            steps_per_epoch=single_train_generator.n // BS,
+            initial_epoch=initial_epoch,
+            epochs=EPOCHS,
+            validation_data=single_validation_generator,
+            validation_steps=single_validation_generator.n // BS,
+            callbacks=[best_checkpoint, last_checkpoint, loss_history, tensorBoard])
 
 # save the model to disk
 print("Saved model to disk")

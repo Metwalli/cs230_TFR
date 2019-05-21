@@ -113,9 +113,9 @@ def load_densenet_model(use_weights, pooling='avg'):
                              input_shape=(224, 224, 3), pooling=pooling)
     return base_model
 
-def load_inceptionresnet_model(use_weights, pooling='avg'):
+def load_inceptionresnet_model(use_weights, pooling='avg', input_tensor=None):
     weights = 'imagenet' if use_weights == True else None
-    base_model = InceptionResNetV2(include_top=False, weights=weights, input_tensor=Input(shape=(299, 299, 3)),
+    base_model = InceptionResNetV2(include_top=False, weights=weights, input_tensor=input_tensor,
                              input_shape=(299, 299, 3), pooling=pooling)
     return base_model
 
@@ -128,7 +128,8 @@ class DenseNetInceptionResnetModel():
     def get_model(self):
         dense_model = load_densenet_model(self.use_imagenet_weights, pooling='avg')
         dense_out = dense_model.layers[-1].output
-        inception_model = load_inceptionresnet_model(self.use_imagenet_weights, pooling='avg')
+        dense_input = dense_model.layers[0].output
+        inception_model = load_inceptionresnet_model(self.use_imagenet_weights, pooling='avg', input_tensor=dense_input)
         inception_out = inception_model.layers[-1].output
         out = concat_fn([dense_out, inception_out], 1)
         classifier = classifier_fn(layer=out, num_labels=self.num_labels, actv='softmax')

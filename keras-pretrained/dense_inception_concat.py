@@ -126,13 +126,11 @@ class DenseNetInceptionResnetModel():
         self.model = self.get_model()
 
     def get_model(self):
-        dense_model = load_densenet_model(self.use_imagenet_weights, pooling=None)
+        dense_model = load_densenet_model(self.use_imagenet_weights, pooling='avg')
         dense_out = dense_model.layers[-1].output
-        dense_out = ZeroPadding2D(padding=((1, 0), (1, 0)))(dense_out)
-        inception_model = load_inceptionresnet_model(self.use_imagenet_weights, pooling=None)
+        inception_model = load_inceptionresnet_model(self.use_imagenet_weights, pooling='avg')
         inception_out = inception_model.layers[-1].output
-        out = concat_fn([dense_out, inception_out], 3)
-        out =Global_Average_Pooling(out)
+        out = concat_fn([dense_out, inception_out], 1)
         classifier = classifier_fn(layer=out, num_labels=self.num_labels, actv='softmax')
         model = Model(inputs=[dense_model.input, inception_model.input], outputs=classifier)
         return model

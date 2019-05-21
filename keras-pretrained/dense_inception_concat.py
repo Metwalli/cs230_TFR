@@ -104,19 +104,19 @@ def dense_fn(layer, filters=100):
 def classifier_fn(layer, num_labels=2, actv='softmax'):
     return Dense(num_labels, activation=actv)(layer)
 
-def concat_fn(layers, name=None):
-    return Concatenate(axis=channel_axis, name=name)(layers)
+def concat_fn(layers, axis=channel_axis, name=None):
+    return Concatenate(axis=axis, name=name)(layers)
 
-def load_densenet_model(use_weights):
+def load_densenet_model(use_weights, pooling='avg'):
     weights = 'imagenet' if use_weights == True else None
     base_model = DenseNet121(include_top=False, weights=weights, input_tensor=Input(shape=(224, 224, 3)),
-                             input_shape=(224, 224, 3), pooling='avg')
+                             input_shape=(224, 224, 3), pooling=pooling)
     return base_model
 
-def load_inceptionresnet_model(use_weights):
+def load_inceptionresnet_model(use_weights, pooling='avg'):
     weights = 'imagenet' if use_weights == True else None
-    base_model = InceptionResNetV2(include_top=False, weights=weights, input_tensor=Input(shape=(224, 224, 3)),
-                             input_shape=(224, 224, 3), pooling='avg')
+    base_model = InceptionResNetV2(include_top=False, weights=weights, input_tensor=Input(shape=(299, 299, 3)),
+                             input_shape=(299, 299, 3), pooling=pooling)
     return base_model
 
 class DenseNetInceptionResnetModel():
@@ -128,9 +128,10 @@ class DenseNetInceptionResnetModel():
     def get_model(self):
         dense_model = load_densenet_model(self.use_imagenet_weights)
         dense_out = dense_model.layers[-1].output
+        dense_out = ZeroPadding2D(padding=((1, 0), (1, 0)))(dense_out)
         inception_model = load_inceptionresnet_model(self.use_imagenet_weights)
         inception_out = inception_model.layers[-1].output
-        out = Concatenate(axis=1, name='densenet_incepresnet_concat')([dense_out, inception_out])
+        out = concat_fn([dense_out, inception_out], 3)
         classifier = classifier_fn(layer=out, num_labels=self.num_labels, actv='softmax')
         model = Model(inputs=[dense_model.input, inception_model.input], outputs=classifier)
         return model
@@ -180,7 +181,7 @@ class DensenetWISeRModel():
         slice_out = Flatten()(x)
 
         # combine densenet with Slice Branch
-        out = concat_fn([densenet_out, slice_out])
+        out = concat_fn([densenet_out, slice_out],1)
         out = dense_fn(out, 2048)
         out = dense_fn(out, 2048)
         classifier = classifier_fn(layer=out, num_labels=self.num_labels, actv='softmax')

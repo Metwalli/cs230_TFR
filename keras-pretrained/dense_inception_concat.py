@@ -133,7 +133,7 @@ class DenseNetInceptionResnetModel():
         inception_out = inception_model.layers[-1].output
         out = concat_fn([dense_out, inception_out], 1)
         classifier = classifier_fn(layer=out, num_labels=self.num_labels, actv='softmax')
-        model = Model(inputs=[dense_model.input, inception_model.input], outputs=classifier)
+        model = Model(inputs=dense_model.input, outputs=classifier)
         return model
 
 # Base Model
@@ -175,17 +175,17 @@ class DensenetWISeRModel():
         densenet_out = dense_model.layers[-1].output
 
         # Add Slice Branch
-        slice_input = Input(shape=(224, 224, 3))
+        slice_input = dense_model.layers[0].output
         x = conv2d_bn(slice_input, 320, 224, 5, 'valid')
         x = Max_Pooling(x=x, pool_size=[1, 5], stride=3, padding='valid', name=None)
         slice_out = Flatten()(x)
 
         # combine densenet with Slice Branch
-        out = concat_fn([densenet_out, slice_out],1)
+        out = concat_fn([densenet_out, slice_out], axis=1)
         out = dense_fn(out, 2048)
         out = dense_fn(out, 2048)
         classifier = classifier_fn(layer=out, num_labels=self.num_labels, actv='softmax')
-        model = Model(inputs=[dense_model.input, slice_input], outputs=classifier)
+        model = Model(inputs=dense_model.input, outputs=classifier)
         return model
 
 # improve DenseWISeR model by increase the width of slice branch
@@ -434,7 +434,7 @@ class DenseNetDenseInception():
 
     def Dense_net(self):
 
-        base_model = load_densenet_model(self.use_imagenet_weights)
+        base_model = load_densenet_model(self.use_imagenet_weights, None)
 
         block1_output = base_model.get_layer('pool2_relu').output
         out = self.dense_block(input_x=block1_output, nb_layers=self.num_layers_per_block[0], layer_name='dense_1')
@@ -457,7 +457,7 @@ class DenseNetDenseInception():
             out = dropout_fn(out, rate=self.dropout_rate)
 
         densenet_out = base_model.layers[-1].output
-        out = concat_fn(layers=[out, densenet_out], axis=1, name="densenet_out_denseinception_output")
+        out = concat_fn(layers=[out, densenet_out], axis=3, name="densenet_out_denseinception_output")
         out = Global_Average_Pooling(out)
 
         with tf.variable_scope('fc_2'):

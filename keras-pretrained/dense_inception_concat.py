@@ -435,6 +435,11 @@ class DenseNetDenseInception():
     def Dense_net(self):
 
         base_model = load_densenet_model(self.use_imagenet_weights, None)
+        # Freeze high layers in densent model
+        # for layer in base_model.layers:
+        #     layer.trainable = False
+        #     if layer.name == 'pool2_relu':
+        #         break
 
         block1_output = base_model.get_layer('pool2_relu').output
         out = self.dense_block(input_x=block1_output, nb_layers=self.num_layers_per_block[0], layer_name='dense_1')

@@ -2,6 +2,7 @@
 from __future__ import print_function
 import keras.applications.inception_resnet_v2
 import pandas as pd
+import tensorflow as tf
 import matplotlib.pyplot as plt
 import argparse
 from keras.optimizers import Adam
@@ -207,8 +208,17 @@ else:
 # Initial checkpoints and Tensorboard to monitor training
 
 print("[INFO] compiling model...")
-opt = Adam(lr=INIT_LR, decay=INIT_LR / EPOCHS)
-model.compile(loss="categorical_crossentropy", optimizer=opt,
+global_step = tf.train.get_or_create_global_step()
+decay_steps = int(single_train_generator.n / BS * 2)
+learning_rate = tf.train.exponential_decay(INIT_LR,
+                           global_step,
+                           decay_steps,
+                           0.94,
+                           staircase=True,
+                           name='exponential_decay_learning_rate')
+optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate, epsilon=1.1e-5)
+# opt = Adam(lr=INIT_LR, decay=INIT_LR / EPOCHS)
+model.compile(loss="categorical_crossentropy", optimizer=optimizer,
               metrics=["accuracy", "top_k_categorical_accuracy"])
 
 
@@ -247,7 +257,7 @@ else:
             epochs=EPOCHS,
             validation_data=single_validation_generator,
             validation_steps=single_validation_generator.n // BS,
-            callbacks=[best_checkpoint, last_checkpoint, loss_history, tensorBoard])
+            callbacks=[best_checkpoint, last_checkpoint, loss_history])
 
 # save the model to disk
 print("Saved model to disk")

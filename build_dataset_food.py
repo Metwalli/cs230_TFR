@@ -93,7 +93,7 @@ if __name__ == '__main__':
 
     # partition the data into training and testing splits using 80% of
     # the data for training and the remaining 20% for testing
-    split = int(0.67 * len(image_paths))
+    split = int(0.50 * len(image_paths))
     train_filenames = image_paths[:split]
     eval_filenames = image_paths[split:]
 

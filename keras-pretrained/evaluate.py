@@ -42,10 +42,9 @@ restore_from = args["restore_from"]
 
 params = Params(os.path.join(model_dir, 'params.json'))
 
-IMAGE_DIMS = (params.image_size, params.image_size, 3)
+IMAGE_DIMS = (params.image1_size, params.image1_size, 3)
 BS = params.batch_size
 model_name = params.model_name
-use_imagenet_weights = False
 
 
 # Dataset Directory

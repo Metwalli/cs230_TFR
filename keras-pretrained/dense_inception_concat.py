@@ -443,23 +443,19 @@ class DenseNetDenseInception():
 
         block1_output = base_model.get_layer('pool2_relu').output
         out = self.dense_block(input_x=block1_output, nb_layers=self.num_layers_per_block[0], layer_name='dense_1')
-        out = self.inception_module_A(out, scope="incepA_")
-        if self.dropout_rate > 0:
-            out = dropout_fn(out, rate=self.dropout_rate)
+        out = self.reduction_A(out)
 
-        block2_output = base_model.get_layer('pool3_relu').output
-        out = concat_fn([out, block2_output], name="incepA_output_block2_output")
+        # block2_output = base_model.get_layer('pool3_relu').output
+        # out = concat_fn([out, block2_output], name="incepA_output_block2_output")
         out = self.dense_block(input_x=out, nb_layers=self.num_layers_per_block[1], layer_name='dense_2')
-        out = self.inception_module_B(out, scope="incepB_")
-        if self.dropout_rate > 0:
-            out = dropout_fn(out, rate=self.dropout_rate)
+        out = self.reduction_B(out)
 
-        block3_output = base_model.get_layer('pool4_relu').output
-        out = concat_fn([out, block3_output], name="incepB_output_block3_output")
+        # block3_output = base_model.get_layer('pool4_relu').output
+        # out = concat_fn([out, block3_output], name="incepB_output_block3_output")
         out = self.dense_block(input_x=out, nb_layers=self.num_layers_per_block[2], layer_name='dense_3')
-        out = self.inception_module_C(out, scope="incepC_")
-        if self.dropout_rate > 0:
-            out = dropout_fn(out, rate=self.dropout_rate)
+        # out = self.inception_module_C(out, scope="incepC_")
+        # if self.dropout_rate > 0:
+        #     out = dropout_fn(out, rate=self.dropout_rate)
 
         densenet_out = base_model.layers[-1].output
         out = concat_fn(layers=[out, densenet_out], axis=3, name="densenet_out_denseinception_output")
@@ -471,6 +467,30 @@ class DenseNetDenseInception():
 
         return model
 
+    def reduction_A(self, x):
+        # Mixed 6a (Reduction-A block): 17 x 17 x 1088
+        branch_0 = conv2d_bn(x, 384, 3, 3, strides=2, padding='valid')
+        branch_1 = conv2d_bn(x, 256, 1, 1)
+        branch_1 = conv2d_bn(branch_1, 256, 3, 3)
+        branch_1 = conv2d_bn(branch_1, 384, 3, 3, strides=2, padding='valid')
+        branch_pool = Max_Pooling(x, 3, stride=2, padding='valid')
+        branches = [branch_0, branch_1, branch_pool]
+        x = concat_fn(branches, axis=channel_axis, name='mixed_6a')
+        return x
+
+    def reduction_B(self, x):
+        # Mixed 7a (Reduction-B block): 8 x 8 x 2080
+        branch_0 = conv2d_bn(x, 256, 1, 1)
+        branch_0 = conv2d_bn(branch_0, 384, 3, 3, strides=2, padding='valid')
+        branch_1 = conv2d_bn(x, 256, 1, 1)
+        branch_1 = conv2d_bn(branch_1, 288, 3, 3, strides=2, padding='valid')
+        branch_2 = conv2d_bn(x, 256, 1, 1)
+        branch_2 = conv2d_bn(branch_2, 288, 3, 3)
+        branch_2 = conv2d_bn(branch_2, 320, 3, 3, strides=2, padding='valid')
+        branch_pool = Max_Pooling(x, 3, stride=2, padding='valid')
+        branches = [branch_0, branch_1, branch_2, branch_pool]
+        x = concat_fn(branches, axis=channel_axis, name='mixed_7a')
+        return x
 
     def inception_module_A(self, x, scope):
         with tf.name_scope(scope):

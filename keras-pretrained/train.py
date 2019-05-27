@@ -20,7 +20,6 @@ from imutils import paths
 import random
 
 # from dense_inception import DenseNetInception
-from tensorboard_wrapper import TensorBoardWrapper
 from dense_inception_concat import DenseNetInceptionInject, DenseNetBaseModel, DenseNetInceptionResnetModel,\
     InceptionResNetModel, DensenetWISeRModel, DensenetWISeR_Impreved_Model, DenseNetDenseInception
 from utils import Params
@@ -208,17 +207,9 @@ else:
 # Initial checkpoints and Tensorboard to monitor training
 
 print("[INFO] compiling model...")
-global_step = tf.train.get_or_create_global_step()
-decay_steps = int(single_train_generator.n / BS * 2)
-learning_rate = tf.train.exponential_decay(INIT_LR,
-                           global_step,
-                           decay_steps,
-                           0.94,
-                           staircase=True,
-                           name='exponential_decay_learning_rate')
-optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate, epsilon=1.1e-5)
-# opt = Adam(lr=INIT_LR, decay=INIT_LR / EPOCHS)
-model.compile(loss="categorical_crossentropy", optimizer=optimizer,
+
+opt = Adam(lr=INIT_LR)
+model.compile(loss="categorical_crossentropy", optimizer=opt,
               metrics=["accuracy", "top_k_categorical_accuracy"])
 
 

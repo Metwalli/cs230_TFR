@@ -145,6 +145,12 @@ class DenseNetBaseModel():
 
     def get_model(self):
         base_model = load_densenet_model(self.use_imagenet_weights)
+        # Freeze high layers in densent model
+        for layer in base_model.layers:
+            layer.trainable = False
+            if layer.name == 'pool2_relu':
+                break
+
         out = base_model.layers[-1].output
         classifier = classifier_fn(layer=out, num_labels=self.num_labels, actv='softmax')
         model = Model(inputs=base_model.input, outputs=classifier)

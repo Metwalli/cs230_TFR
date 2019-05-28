@@ -79,7 +79,7 @@ predictions = [labels[k] for k in predicted_class_indices]
 # Calculate top-1 and top-5 predictions
 top1 = 0.0
 top5 = 0.0
-for i, l in enumerate(test_generator.labels):
+for i, l in enumerate(test_generator.classes):
     pred = preds[i]
     top_values = (-pred).argsort()[:5]
     if top_values[0] == l:

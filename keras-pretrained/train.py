@@ -21,7 +21,8 @@ import random
 
 # from dense_inception import DenseNetInception
 from dense_inception_concat import DenseNetInceptionInject, DenseNetBaseModel, DenseNetInceptionResnetModel,\
-    InceptionResNetModel, DensenetWISeRModel, DensenetWISeR_Impreved_Model, DenseNetDenseInception
+    InceptionResNetModel, DensenetWISeRModel, DensenetWISeR_Impreved_Model, DenseNetDenseInception, DenseNet121_Modify
+
 from utils import Params
 from loss_history import LossHistory
 
@@ -184,6 +185,8 @@ EPOCHS += initial_epoch
 if restore_from is None:
     if model_name == 'densenet':
         model = DenseNetBaseModel(CLASSES, use_imagenet_weights).model
+    elif model_name == "densenet_m":
+        model = DenseNet121_Modify(CLASSES).model
     elif model_name == "incep_resnet":
         model = InceptionResNetModel(num_labels=CLASSES, use_imagenet_weights=use_imagenet_weights).model
     elif model_name == 'concat':

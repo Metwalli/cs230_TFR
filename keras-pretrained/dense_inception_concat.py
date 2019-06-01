@@ -9,6 +9,8 @@ from keras.applications.inception_v3 import InceptionV3
 from keras.applications.inception_resnet_v2 import InceptionResNetV2
 from keras.utils import plot_model
 
+from densenet_modify import DenseNet121
+
 channel_axis = 3 if image_data_format() == 'channels_last' else 1
 eps = 1.001e-5
 num_classes = 10
@@ -155,6 +157,18 @@ class DenseNetBaseModel():
         classifier = classifier_fn(layer=out, num_labels=self.num_labels, actv='softmax')
         model = Model(inputs=base_model.input, outputs=classifier)
         return model
+
+# Densenet Modify
+
+class DenseNet121_Modify():
+    def __init__(self, num_labels):
+        self.num_labels = num_labels
+        self.model = self.get_model()
+    def get_model(self):
+        model = DenseNet121(include_top=True, weights=None, input_tensor=Input(shape=(224, 224, 3)),
+                            input_shape=(224, 224, 3), pooling='avg')
+        return model
+
 
 # InceptionResnet Model
 class InceptionResNetModel():

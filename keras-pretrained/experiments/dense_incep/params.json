@@ -1,8 +1,8 @@
 {
-    "learning_rate": 1e-4,
+    "learning_rate": 1e-3,
     "eps": 1.1e-5,
-    "batch_size": 20,
-    "num_epochs": 10,
+    "batch_size": 16,
+    "num_epochs": 25,
 
     "num_filters": 32,
     "growth_rate": 32,
@@ -10,9 +10,10 @@
     "bn_momentum": 0.9,
     "dropout_rate": 0.5,
     "compression_rate": 1.0,
-    "num_layers_per_block": [6, 12, 16, 1],
+    "num_layers_per_block": [6, 8, 8, 1],
 
-    "image_size": 224,
+    "image1_size": 224,
+    "image2_size": 224,
     "use_random_flip": true,
     "num_labels": 172,
 
@@ -20,10 +21,11 @@
     "save_period_step": 1,
 
     "data_dir": "/home/ai309/metwalli/data/VIREO/172",
-    "model_name": "incept",
+    "model_name": "densenet_m",
     "results_path": "output/results.txt",
     "model_path"      : "output/model",
     "classifier_path" : "output/classifier",
-    "use_imagenet_weights": true
+    "use_imagenet_weights": true,
+    "num_inputs" : 1
 
 }

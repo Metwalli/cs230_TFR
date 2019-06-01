@@ -21,7 +21,8 @@ import random
 
 # from dense_inception import DenseNetInception
 from dense_inception_concat import DenseNetInceptionInject, DenseNetBaseModel, DenseNetInceptionResnetModel,\
-    InceptionResNetModel, DensenetWISeRModel, DensenetWISeR_Impreved_Model, DenseNetDenseInception, DenseNet121_Modify
+    InceptionResNetModel, DensenetWISeRModel, DensenetWISeR_Impreved_Model, DenseNetDenseInception,\
+    DenseNet121_Modify
 
 from utils import Params
 from loss_history import LossHistory

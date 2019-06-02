@@ -177,31 +177,33 @@ class DenseNet121_Modify():
             output tensor for the block.
         """
         for i in range(blocks):
-            x = self.conv_block(x, 32, name=name + '_block' + str(i + 1))
+            x = self.conv_block_m(x, 32, name=name + '_block' + str(i + 1))
         return x
 
 
-    def reduction_A(self, x):
+    def reduction_A(self, x, reduction=0.5):
         # Mixed 6a (Reduction-A block): 17 x 17 x 1088
-        branch_0 = conv2d_bn(x, 384, 3, 3, strides=2, padding='valid')
-        branch_1 = conv2d_bn(x, 256, 1, 1)
-        branch_1 = conv2d_bn(branch_1, 256, 3, 3)
-        branch_1 = conv2d_bn(branch_1, 384, 3, 3, strides=2, padding='valid')
+        filters = int(int_shape(x)[3] * reduction)
+        branch_0 = conv2d_bn(x, filters+64, 3, 3, strides=2, padding='valid')
+        branch_1 = conv2d_bn(x, filters, 1, 1)
+        branch_1 = conv2d_bn(branch_1, filters, 3, 3)
+        branch_1 = conv2d_bn(branch_1, filters+64, 3, 3, strides=2, padding='valid')
         branch_pool = Max_Pooling(x, 3, stride=2, padding='valid')
         branches = [branch_0, branch_1, branch_pool]
         x = concat_fn(branches, axis=3, name='mixed_6a')
         return x
 
 
-    def reduction_B(self, x, name=None):
+    def reduction_B(self, x, reduction=0.5, name=None):
         # Mixed 7a (Reduction-B block): 8 x 8 x 2080
-        branch_0 = conv2d_bn(x, 256, 1, 1)
-        branch_0 = conv2d_bn(branch_0, 384, 3, 3, strides=2, padding='valid')
-        branch_1 = conv2d_bn(x, 256, 1, 1)
-        branch_1 = conv2d_bn(branch_1, 288, 3, 3, strides=2, padding='valid')
-        branch_2 = conv2d_bn(x, 256, 1, 1)
-        branch_2 = conv2d_bn(branch_2, 288, 3, 3)
-        branch_2 = conv2d_bn(branch_2, 320, 3, 3, strides=2, padding='valid')
+        filters = int(int_shape(x)[3] * reduction)
+        branch_0 = conv2d_bn(x, filters, 1, 1)
+        branch_0 = conv2d_bn(branch_0, filters+64, 3, 3, strides=2, padding='valid')
+        branch_1 = conv2d_bn(x, filters, 1, 1)
+        branch_1 = conv2d_bn(branch_1, filters+32, 3, 3, strides=2, padding='valid')
+        branch_2 = conv2d_bn(x, filters, 1, 1)
+        branch_2 = conv2d_bn(branch_2, filters+32, 3, 3)
+        branch_2 = conv2d_bn(branch_2, filters+64, 3, 3, strides=2, padding='valid')
         branch_pool = Max_Pooling(x, 3, stride=2, padding='valid')
         branches = [branch_0, branch_1, branch_2, branch_pool]
         x = concat_fn(branches, axis=3, name=name)
@@ -259,9 +261,58 @@ class DenseNet121_Modify():
         x = Concatenate(axis=bn_axis, name=name + '_concat')([x, x1])
         return x
 
+    def conv_block_m(self, x, growth_rate, name):
+        """A building block for a dense block.
+
+        # Arguments
+            x: input tensor.
+            growth_rate: float, growth rate at dense layers.
+            name: string, block label.
+
+        # Returns
+            Output tensor for the block.
+        """
+        bn_axis = 3 if image_data_format() == 'channels_last' else 1
+        x1 = BatchNormalization(axis=bn_axis,
+                                       epsilon=1.001e-5,
+                                       name=name + '_0_bn')(x)
+        x1 = Activation('relu', name=name + '_0_relu')(x1)
+        x1 = Conv2D(4 * growth_rate, 1,
+                           use_bias=False,
+                           name=name + '_1_conv')(x1)
+        x1 = BatchNormalization(axis=bn_axis, epsilon=1.001e-5,
+                                       name=name + '_1_bn')(x1)
+        x1 = Activation('relu', name=name + '_1_relu')(x1)
+        x1 = Conv2D(growth_rate, 3,
+                           padding='same',
+                           use_bias=False,
+                           name=name + '_2_conv')(x1)
+        x2 = BatchNormalization(axis=bn_axis,
+                                epsilon=1.001e-5,
+                                name=name + '_x20_bn')(x)
+        x2 = Activation('relu', name=name + '_x20_relu')(x2)
+        x2 = Conv2D(4 * growth_rate, 1,
+                    use_bias=False,
+                    name=name + '_x21_conv')(x2)
+        x2 = BatchNormalization(axis=bn_axis, epsilon=1.001e-5,
+                                name=name + '_x21_bn')(x2)
+        x2 = Activation('relu', name=name + '_x21_relu')(x2)
+        x2 = Conv2D(growth_rate, [1, 3],
+                    padding='same',
+                    use_bias=False,
+                    name=name + '_x213_conv')(x2)
+        x2 = BatchNormalization(axis=bn_axis, epsilon=1.001e-5,
+                                name=name + '_x22_bn')(x2)
+        x2 = Activation('relu', name=name + '_x22_relu')(x2)
+        x2 = Conv2D(growth_rate, [3, 1],
+                    padding='same',
+                    use_bias=False,
+                    name=name + '_x231_conv')(x2)
+        x = Concatenate(axis=bn_axis, name=name + '_concat')([x, x1, x2])
+        return x
 
     def DenseNet(self, blocks,
-                 input_shape=(224,224,3),
+                 input_shape=(224, 224, 3),
                  classes=172):
 
         img_input = Input(shape=input_shape)
@@ -277,11 +328,11 @@ class DenseNet121_Modify():
         x = MaxPooling2D(3, strides=2, name='pool1')(x)
 
         x = self.dense_block(x, blocks[0], name='conv2')
-        x = self.reduction_A(x)
+        x = self.transition_block(x, 0.5, name='pool2')
         x = self.dense_block(x, blocks[1], name='conv3')
-        x = self.reduction_B(x, "max_a1")
+        x = self.transition_block(x, 0.5, name='pool3')
         x = self.dense_block(x, blocks[2], name='conv4')
-        x = self.reduction_B(x, "max_a2")
+        x = self.transition_block(x, 0.5, name='pool4')
         x = self.dense_block(x, blocks[3], name='conv5')
 
         x = BatchNormalization(
@@ -290,7 +341,7 @@ class DenseNet121_Modify():
 
 
         x = GlobalAveragePooling2D(name='avg_pool')(x)
-        x = Dense(classes, activation='softmax', name='fc1000')(x)
+        x = Dense(classes, activation='softmax', name='fc172')(x)
         inputs = img_input
 
         model = Model(inputs, x, name='densenet')

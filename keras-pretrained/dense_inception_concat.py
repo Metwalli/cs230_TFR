@@ -247,17 +247,18 @@ class DenseNet121_Modify():
         filters = int(int_shape(x)[bn_axis] * reduction)
 
         x1 = Conv2D(filters, 1,
-                   use_bias=False,
-                   name=name + '_conv1')(x)
+                    use_bias=False,
+                    name=name + '_conv1')(x)
         x1 = BatchNormalization(axis=bn_axis, epsilon=1.001e-5,
-                                      name=name + '_bn1')(x1)
+                                name=name + '_bn1')(x1)
         x1 = Activation('relu', name=name + '_relu1')(x1)
         x1 = Conv2D(filters, 3,
-                   use_bias=False,
-                   padding='same',
-                   name=name + '_conv2')(x1)
+                    strides=2,
+                    padding='same',
+                    use_bias=False,
+                    name=name + '_conv2')(x1)
         x1 = BatchNormalization(axis=bn_axis, epsilon=1.001e-5,
-                               name=name + '_bn2')(x1)
+                                name=name + '_bn2')(x1)
         x1 = Activation('relu', name=name + '_relu2')(x1)
         x1 = Conv2D(filters, 1,
                     use_bias=False,

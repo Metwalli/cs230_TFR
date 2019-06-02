@@ -254,6 +254,7 @@ class DenseNet121_Modify():
         x1 = Activation('relu', name=name + '_relu1')(x1)
         x1 = Conv2D(filters, 3,
                    use_bias=False,
+                   padding='same',
                    name=name + '_conv2')(x1)
         x1 = BatchNormalization(axis=bn_axis, epsilon=1.001e-5,
                                name=name + '_bn2')(x1)

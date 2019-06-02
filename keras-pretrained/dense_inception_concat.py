@@ -177,7 +177,7 @@ class DenseNet121_Modify():
             output tensor for the block.
         """
         for i in range(blocks):
-            x = self.conv_block_m(x, 32, name=name + '_block' + str(i + 1))
+            x = self.conv_block(x, 32, name=name + '_block' + str(i + 1))
         return x
 
 
@@ -209,6 +209,70 @@ class DenseNet121_Modify():
         x = concat_fn(branches, axis=3, name=name)
         return x
 
+    def stem(self, img_input):
+        bn_axis = 3 if image_data_format() == 'channels_last' else 1
+
+        x = ZeroPadding2D(padding=((3, 3), (3, 3)))(img_input)
+        x = Conv2D(32, 3, strides=2, use_bias=False, name='stem/conv1')(x)
+        x = BatchNormalization(
+            axis=bn_axis, epsilon=1.001e-5, name='stem/bn1')(x)
+        x = Activation('relu', name='stem/relu1')(x)
+        x = Conv2D(32, 3, strides=1, use_bias=False, name='stem/conv2')(x)
+        x = BatchNormalization(
+            axis=bn_axis, epsilon=1.001e-5, name='stem/bn2')(x)
+        x = Activation('relu', name='stem/relu2')(x)
+        x = Conv2D(64, 3, strides=1, use_bias=False, name='stem/conv3')(x)
+        x = BatchNormalization(
+            axis=bn_axis, epsilon=1.001e-5, name='stem/bn3')(x)
+        x = Activation('relu', name='stem/relu3')(x)
+        x1 = Conv2D(64, 3, strides=2, use_bias=False, name='stem/conv4')(x)
+        x1 = BatchNormalization(
+            axis=bn_axis, epsilon=1.001e-5, name='stem/bn4')(x1)
+        x1 = Activation('relu', name='stem/relu4')(x1)
+        x2 = MaxPooling2D(3, strides=2, name='stem/pool1')(x)
+        x = concat_fn([x1, x2], bn_axis)
+        return x
+    def transition_block_m(self, x, reduction, name):
+        """A transition block.
+
+        # Arguments
+            x: input tensor.
+            reduction: float, compression rate at transition layers.
+            name: string, block label.
+
+        # Returns
+            output tensor for the block.
+        """
+        bn_axis = 3 if image_data_format() == 'channels_last' else 1
+        filters = int(int_shape(x)[bn_axis] * reduction)
+
+        x1 = Conv2D(filters, 1,
+                   use_bias=False,
+                   name=name + '_conv1')(x)
+        x1 = BatchNormalization(axis=bn_axis, epsilon=1.001e-5,
+                                      name=name + '_bn1')(x1)
+        x1 = Activation('relu', name=name + '_relu1')(x1)
+        x1 = Conv2D(filters, 3,
+                   use_bias=False,
+                   name=name + '_conv2')(x1)
+        x1 = BatchNormalization(axis=bn_axis, epsilon=1.001e-5,
+                               name=name + '_bn2')(x1)
+        x1 = Activation('relu', name=name + '_relu2')(x1)
+        x1 = Conv2D(filters, 1,
+                    use_bias=False,
+                    name=name + '_conv3')(x1)
+        x1 = BatchNormalization(axis=bn_axis, epsilon=1.001e-5,
+                                name=name + '_bn3')(x1)
+        x1 = Activation('relu', name=name + '_relu3')(x1)
+        x2 = AveragePooling2D(2, strides=2, name=name + '_pool')(x)
+        x2 = Conv2D(filters, 1,
+                    use_bias=False,
+                    name=name + '_conv4')(x2)
+        x2 = BatchNormalization(axis=bn_axis, epsilon=1.001e-5,
+                                name=name + '_bn4')(x2)
+        x2 = Activation('relu', name=name + '_relu4')(x2)
+        x = concat_fn([x1, x2], bn_axis)
+        return x
 
     def transition_block(self, x, reduction, name):
         """A transition block.
@@ -222,12 +286,13 @@ class DenseNet121_Modify():
             output tensor for the block.
         """
         bn_axis = 3 if image_data_format() == 'channels_last' else 1
+        x = Conv2D(int(int_shape(x)[bn_axis] * reduction), 1,
+                   use_bias=False,
+                   name=name + '_conv')(x)
         x = BatchNormalization(axis=bn_axis, epsilon=1.001e-5,
                                       name=name + '_bn')(x)
         x = Activation('relu', name=name + '_relu')(x)
-        x = Conv2D(int(int_shape(x)[bn_axis] * reduction), 1,
-                          use_bias=False,
-                          name=name + '_conv')(x)
+
         x = AveragePooling2D(2, strides=2, name=name + '_pool')(x)
         return x
 
@@ -244,20 +309,22 @@ class DenseNet121_Modify():
             Output tensor for the block.
         """
         bn_axis = 3 if image_data_format() == 'channels_last' else 1
+        x1 = Conv2D(4 * growth_rate, 1,
+                    use_bias=False,
+                    name=name + '_1_conv')(x)
         x1 = BatchNormalization(axis=bn_axis,
                                        epsilon=1.001e-5,
-                                       name=name + '_0_bn')(x)
+                                       name=name + '_0_bn')(x1)
         x1 = Activation('relu', name=name + '_0_relu')(x1)
-        x1 = Conv2D(4 * growth_rate, 1,
-                           use_bias=False,
-                           name=name + '_1_conv')(x1)
+
+        x1 = Conv2D(growth_rate, 3,
+                    padding='same',
+                    use_bias=False,
+                    name=name + '_2_conv')(x1)
         x1 = BatchNormalization(axis=bn_axis, epsilon=1.001e-5,
                                        name=name + '_1_bn')(x1)
         x1 = Activation('relu', name=name + '_1_relu')(x1)
-        x1 = Conv2D(growth_rate, 3,
-                           padding='same',
-                           use_bias=False,
-                           name=name + '_2_conv')(x1)
+
         x = Concatenate(axis=bn_axis, name=name + '_concat')([x, x1])
         return x
 
@@ -302,12 +369,15 @@ class DenseNet121_Modify():
                     use_bias=False,
                     name=name + '_x213_conv')(x2)
         x2 = BatchNormalization(axis=bn_axis, epsilon=1.001e-5,
-                                name=name + '_x22_bn')(x2)
-        x2 = Activation('relu', name=name + '_x22_relu')(x2)
+                                name=name + '_x213_bn')(x2)
+        x2 = Activation('relu', name=name + '_x213_relu')(x2)
         x2 = Conv2D(growth_rate, [3, 1],
                     padding='same',
                     use_bias=False,
                     name=name + '_x231_conv')(x2)
+        x2 = BatchNormalization(axis=bn_axis, epsilon=1.001e-5,
+                                name=name + '_x231_bn')(x2)
+        x2 = Activation('relu', name=name + '_x231_relu')(x2)
         x = Concatenate(axis=bn_axis, name=name + '_concat')([x, x1, x2])
         return x
 
@@ -319,20 +389,24 @@ class DenseNet121_Modify():
 
         bn_axis = 3 if image_data_format() == 'channels_last' else 1
 
-        x = ZeroPadding2D(padding=((3, 3), (3, 3)))(img_input)
-        x = Conv2D(64, 7, strides=2, use_bias=False, name='conv1/conv')(x)
-        x = BatchNormalization(
-            axis=bn_axis, epsilon=1.001e-5, name='conv1/bn')(x)
-        x = Activation('relu', name='conv1/relu')(x)
-        x = ZeroPadding2D(padding=((1, 1), (1, 1)))(x)
-        x = MaxPooling2D(3, strides=2, name='pool1')(x)
+        # x = ZeroPadding2D(padding=((3, 3), (3, 3)))(img_input)
+        # x = Conv2D(64, 7, strides=2, use_bias=False, name='conv1/conv')(x)
+        # x = BatchNormalization(
+        #     axis=bn_axis, epsilon=1.001e-5, name='conv1/bn')(x)
+        # x = Activation('relu', name='conv1/relu')(x)
+        # x = ZeroPadding2D(padding=((1, 1), (1, 1)))(x)
+        # x = MaxPooling2D(3, strides=2, name='pool1')(x)
+        # x = BatchNormalization(
+        #     axis=bn_axis, epsilon=1.001e-5, name='pool1/bn')(x)
+        # x = Activation('relu', name='pool1/relu')(x)
+        x = self.stem(img_input)
 
         x = self.dense_block(x, blocks[0], name='conv2')
-        x = self.transition_block(x, 0.5, name='pool2')
+        x = self.transition_block_m(x, 0.5, name='pool2')
         x = self.dense_block(x, blocks[1], name='conv3')
-        x = self.transition_block(x, 0.5, name='pool3')
+        x = self.transition_block_m(x, 0.5, name='pool3')
         x = self.dense_block(x, blocks[2], name='conv4')
-        x = self.transition_block(x, 0.5, name='pool4')
+        x = self.transition_block_m(x, 0.5, name='pool4')
         x = self.dense_block(x, blocks[3], name='conv5')
 
         x = BatchNormalization(

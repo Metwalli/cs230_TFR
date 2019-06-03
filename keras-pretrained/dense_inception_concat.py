@@ -443,7 +443,7 @@ class DensenetWISeRModel():
         self.use_imagenet_weights = use_imagenet_weights
         self.model = self.get_model()
 
-    def get_model(self):
+    def get_model1(self):
         # dense_model = load_densenet_model(self.use_imagenet_weights)
         # densenet_out = dense_model.layers[-1].output
 
@@ -461,6 +461,106 @@ class DensenetWISeRModel():
         classifier = classifier_fn(layer=out, num_labels=self.num_labels, actv='softmax')
         model = Model(inputs=slice_input, outputs=classifier)
         return model
+
+    def dense_block(self, x, blocks, name):
+        """A dense block.
+
+        # Arguments
+            x: input tensor.
+            blocks: integer, the number of building blocks.
+            name: string, block label.
+
+        # Returns
+            output tensor for the block.
+        """
+        for i in range(blocks):
+            x = self.conv_block(x, 32, name=name + '_block' + str(i + 1))
+        return x
+
+    def transition_block(self, x, reduction, name):
+        """A transition block.
+
+        # Arguments
+            x: input tensor.
+            reduction: float, compression rate at transition layers.
+            name: string, block label.
+
+        # Returns
+            output tensor for the block.
+        """
+        bn_axis = 3 if image_data_format() == 'channels_last' else 1
+        x = BatchNormalization(axis=bn_axis, epsilon=1.001e-5,
+                                      name=name + '_bn')(x)
+        x = Activation('relu', name=name + '_relu')(x)
+        x = Conv2D(int(int_shape(x)[bn_axis] * reduction), 1,
+                          use_bias=False,
+                          name=name + '_conv')(x)
+        x = AveragePooling2D(2, strides=2, name=name + '_pool')(x)
+        return x
+
+
+    def conv_block(self, x, growth_rate, name):
+        """A building block for a dense block.
+
+        # Arguments
+            x: input tensor.
+            growth_rate: float, growth rate at dense layers.
+            name: string, block label.
+
+        # Returns
+            Output tensor for the block.
+        """
+        bn_axis = 3 if image_data_format() == 'channels_last' else 1
+
+        x1 = BatchNormalization(axis=bn_axis, epsilon=1.001e-5,
+                                       name=name + '_1_bn')(x)
+        x1 = Activation('relu', name=name + '_1_relu')(x1)
+        x1 = Conv2D(growth_rate, [1, 3],
+                           padding='same',
+                           use_bias=False,
+                           name=name + '_2_conv')(x1)
+        x = Concatenate(axis=bn_axis, name=name + '_concat')([x, x1])
+        return x
+
+    def DenseNet(self, blocks,
+                 input_shape=(224, 224, 3),
+                 classes=172):
+
+        img_input = Input(shape=input_shape)
+
+        bn_axis = 3 if image_data_format() == 'channels_last' else 1
+
+        slice_input = img_input
+        x = conv2d_bn(slice_input, 320, 224, 5, 'valid')
+        x = Max_Pooling(x=x, pool_size=[1, 5], stride=3, padding='valid', name=None)
+
+        x = self.dense_block(x, blocks[0], name='conv2')
+        x = self.transition_block(x, 0.5, name='pool2')
+        x = self.dense_block(x, blocks[1], name='conv3')
+        x = self.transition_block(x, 0.5, name='pool3')
+        x = self.dense_block(x, blocks[2], name='conv4')
+        x = self.transition_block(x, 0.5, name='pool4')
+        x = self.dense_block(x, blocks[3], name='conv5')
+
+        x = BatchNormalization(
+            axis=bn_axis, epsilon=1.001e-5, name='bn')(x)
+        x = Activation('relu', name='relu')(x)
+
+
+        x = GlobalAveragePooling2D(name='avg_pool')(x)
+        x = Dense(classes, activation='softmax', name='fc172')(x)
+        inputs = img_input
+
+        model = Model(inputs, x, name='densenet')
+
+        return model
+
+
+    def get_model(self):
+        model = self.DenseNet([6, 12, 24, 16])
+        return model
+
+
 
 # improve DenseWISeR model by increase the width of slice branch
 class DensenetWISeR_Impreved_Model():

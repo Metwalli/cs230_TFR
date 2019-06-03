@@ -266,7 +266,7 @@ class DenseNet121_Modify():
         x1 = BatchNormalization(axis=bn_axis, epsilon=1.001e-5,
                                 name=name + '_bn3')(x1)
         x1 = Activation('relu', name=name + '_relu3')(x1)
-        x2 = AveragePooling2D(2, strides=2, name=name + '_pool')(x)
+        x2 = AveragePooling2D(2, strides=2, padding='same', name=name + '_pool')(x)
         x2 = Conv2D(filters, 1,
                     use_bias=False,
                     name=name + '_conv4')(x2)
@@ -288,13 +288,12 @@ class DenseNet121_Modify():
             output tensor for the block.
         """
         bn_axis = 3 if image_data_format() == 'channels_last' else 1
-        x = Conv2D(int(int_shape(x)[bn_axis] * reduction), 1,
-                   use_bias=False,
-                   name=name + '_conv')(x)
         x = BatchNormalization(axis=bn_axis, epsilon=1.001e-5,
                                       name=name + '_bn')(x)
         x = Activation('relu', name=name + '_relu')(x)
-
+        # x = Conv2D(int(int_shape(x)[bn_axis] * reduction), 1,
+        #                   use_bias=False,
+        #                   name=name + '_conv')(x)
         x = AveragePooling2D(2, strides=2, name=name + '_pool')(x)
         return x
 
@@ -311,22 +310,20 @@ class DenseNet121_Modify():
             Output tensor for the block.
         """
         bn_axis = 3 if image_data_format() == 'channels_last' else 1
-        x1 = Conv2D(4 * growth_rate, 1,
-                    use_bias=False,
-                    name=name + '_1_conv')(x)
         x1 = BatchNormalization(axis=bn_axis,
                                        epsilon=1.001e-5,
-                                       name=name + '_0_bn')(x1)
+                                       name=name + '_0_bn')(x)
         x1 = Activation('relu', name=name + '_0_relu')(x1)
-
-        x1 = Conv2D(growth_rate, 3,
-                    padding='same',
-                    use_bias=False,
-                    name=name + '_2_conv')(x1)
+        x1 = Conv2D(4 * growth_rate, 1,
+                           use_bias=False,
+                           name=name + '_1_conv')(x1)
         x1 = BatchNormalization(axis=bn_axis, epsilon=1.001e-5,
                                        name=name + '_1_bn')(x1)
         x1 = Activation('relu', name=name + '_1_relu')(x1)
-
+        x1 = Conv2D(growth_rate, 3,
+                           padding='same',
+                           use_bias=False,
+                           name=name + '_2_conv')(x1)
         x = Concatenate(axis=bn_axis, name=name + '_concat')([x, x1])
         return x
 
@@ -391,17 +388,13 @@ class DenseNet121_Modify():
 
         bn_axis = 3 if image_data_format() == 'channels_last' else 1
 
-        # x = ZeroPadding2D(padding=((3, 3), (3, 3)))(img_input)
-        # x = Conv2D(64, 7, strides=2, use_bias=False, name='conv1/conv')(x)
-        # x = BatchNormalization(
-        #     axis=bn_axis, epsilon=1.001e-5, name='conv1/bn')(x)
-        # x = Activation('relu', name='conv1/relu')(x)
-        # x = ZeroPadding2D(padding=((1, 1), (1, 1)))(x)
-        # x = MaxPooling2D(3, strides=2, name='pool1')(x)
-        # x = BatchNormalization(
-        #     axis=bn_axis, epsilon=1.001e-5, name='pool1/bn')(x)
-        # x = Activation('relu', name='pool1/relu')(x)
-        x = self.stem(img_input)
+        x = ZeroPadding2D(padding=((3, 3), (3, 3)))(img_input)
+        x = Conv2D(64, 7, strides=2, use_bias=False, name='conv1/conv')(x)
+        x = BatchNormalization(
+            axis=bn_axis, epsilon=1.001e-5, name='conv1/bn')(x)
+        x = Activation('relu', name='conv1/relu')(x)
+        x = ZeroPadding2D(padding=((1, 1), (1, 1)))(x)
+        x = MaxPooling2D(3, strides=2, name='pool1')(x)
 
         x = self.dense_block(x, blocks[0], name='conv2')
         x = self.transition_block_m(x, 0.5, name='pool2')
@@ -451,21 +444,22 @@ class DensenetWISeRModel():
         self.model = self.get_model()
 
     def get_model(self):
-        dense_model = load_densenet_model(self.use_imagenet_weights)
-        densenet_out = dense_model.layers[-1].output
+        # dense_model = load_densenet_model(self.use_imagenet_weights)
+        # densenet_out = dense_model.layers[-1].output
 
         # Add Slice Branch
-        slice_input = dense_model.layers[0].output
+        # slice_input = dense_model.layers[0].output
+        slice_input = Input(shape=(224, 224, 3))
         x = conv2d_bn(slice_input, 320, 224, 5, 'valid')
         x = Max_Pooling(x=x, pool_size=[1, 5], stride=3, padding='valid', name=None)
-        slice_out = Flatten()(x)
+        out = Global_Average_Pooling(x)
 
         # combine densenet with Slice Branch
-        out = concat_fn([densenet_out, slice_out], axis=1)
+        # out = concat_fn([densenet_out, slice_out], axis=1)
         out = dense_fn(out, 2048)
         out = dense_fn(out, 2048)
         classifier = classifier_fn(layer=out, num_labels=self.num_labels, actv='softmax')
-        model = Model(inputs=dense_model.input, outputs=classifier)
+        model = Model(inputs=slice_input, outputs=classifier)
         return model
 
 # improve DenseWISeR model by increase the width of slice branch

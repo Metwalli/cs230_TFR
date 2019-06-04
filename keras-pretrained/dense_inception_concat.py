@@ -474,7 +474,7 @@ class DensenetWISeRModel():
             output tensor for the block.
         """
         for i in range(blocks):
-            x = self.conv_block(x, 32, name=name + '_block' + str(i + 1))
+            x = self.conv_block(x, 32, name=name + '_block_' + str(i + 1))
         return x
 
     def transition_block(self, x, reduction, name):
@@ -495,7 +495,7 @@ class DensenetWISeRModel():
         x = Conv2D(int(int_shape(x)[bn_axis] * reduction), 1,
                           use_bias=False,
                           name=name + '_conv')(x)
-        x = AveragePooling2D(2, strides=2, name=name + '_pool')(x)
+        x = AveragePooling2D([1,2], strides=2, name=name + '_pool')(x)
         return x
 
 
@@ -526,30 +526,37 @@ class DensenetWISeRModel():
                  input_shape=(224, 224, 3),
                  classes=172):
 
-        img_input = Input(shape=input_shape)
+        # img_input = Input(shape=input_shape)
 
         bn_axis = 3 if image_data_format() == 'channels_last' else 1
 
-        slice_input = img_input
+        dense_model = load_densenet_model(self.use_imagenet_weights)
+        densenet_out = dense_model.layers[-1].output
+        slice_input = dense_model.layers[0].output
+
+        # slice_input = img_input
         x = conv2d_bn(slice_input, 320, 224, 5, 'valid')
         x = Max_Pooling(x=x, pool_size=[1, 5], stride=3, padding='valid', name=None)
 
         x = self.dense_block(x, blocks[0], name='conv2')
-        x = self.transition_block(x, 0.5, name='pool2')
+        x = self.transition_block(x, 0.5, name='pool2_')
         x = self.dense_block(x, blocks[1], name='conv3')
-        x = self.transition_block(x, 0.5, name='pool3')
+        x = self.transition_block(x, 0.5, name='pool3_')
         x = self.dense_block(x, blocks[2], name='conv4')
-        x = self.transition_block(x, 0.5, name='pool4')
+        x = self.transition_block(x, 0.5, name='pool4_')
         x = self.dense_block(x, blocks[3], name='conv5')
 
         x = BatchNormalization(
-            axis=bn_axis, epsilon=1.001e-5, name='bn')(x)
-        x = Activation('relu', name='relu')(x)
+            axis=bn_axis, epsilon=1.001e-5, name='bn_')(x)
+        x = Activation('relu', name='relu_')(x)
 
 
-        x = GlobalAveragePooling2D(name='avg_pool')(x)
+        x = GlobalAveragePooling2D(name='avg_pool_')(x)
+
+        x = concat_fn([x, densenet_out], 1)
+
         x = Dense(classes, activation='softmax', name='fc172')(x)
-        inputs = img_input
+        inputs = dense_model.input
 
         model = Model(inputs, x, name='densenet')
 

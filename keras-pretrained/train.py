@@ -11,6 +11,7 @@ from keras.preprocessing.image import ImageDataGenerator
 from tensorflow.python.keras.callbacks import TensorBoard
 from keras.callbacks import ModelCheckpoint
 from keras.models import load_model
+from keras.losses import categorical_crossentropy
 import time
 import os
 import cv2
@@ -26,6 +27,7 @@ from dense_inception_concat import DenseNetInceptionInject, DenseNetBaseModel, D
 
 from utils import Params
 from loss_history import LossHistory
+from center_loss import get_center_loss
 
 
 
@@ -81,6 +83,8 @@ restore_from = args["restore_from"]
 params = Params(os.path.join(model_dir, 'params.json'))
 
 # config variables
+LAMBDA = 0.5
+CENTER_LOSS_ALPHA = 0.5
 EPOCHS = params.num_epochs
 INIT_LR = params.learning_rate
 BS = params.batch_size
@@ -212,8 +216,12 @@ else:
 
 print("[INFO] compiling model...")
 
+center_loss = get_center_loss(single_train_generator.data, single_train_generator.labels, CENTER_LOSS_ALPHA, CLASSES)
+softmax_loss = categorical_crossentropy(single_train_generator.labels, model)
+total_loss = softmax_loss + LAMBDA * center_loss
+
 opt = Adam(lr=INIT_LR)
-model.compile(loss="categorical_crossentropy", optimizer=opt,
+model.compile(loss=total_loss, optimizer=opt,
               metrics=["accuracy", "top_k_categorical_accuracy"])
 
 

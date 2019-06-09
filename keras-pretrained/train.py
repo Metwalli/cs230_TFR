@@ -5,7 +5,7 @@ import pandas as pd
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import argparse
-from keras.optimizers import Adam
+from keras.optimizers import Adam, SGD
 from keras.preprocessing.image import img_to_array
 from keras.preprocessing.image import ImageDataGenerator
 from tensorflow.python.keras.callbacks import TensorBoard
@@ -220,8 +220,8 @@ center_loss = get_center_loss(CENTER_LOSS_ALPHA, CLASSES)
 # softmax_loss = categorical_crossentropy(single_train_generator.labels, model)
 # total_loss = softmax_loss + LAMBDA * center_loss
 
-opt = Adam(lr=INIT_LR)
-model.compile(loss=center_loss, optimizer=opt,
+opt = SGD(INIT_LR) #Adam(lr=INIT_LR)
+model.compile(loss='categorical_crossentropy', optimizer=opt,
               metrics=["accuracy", "top_k_categorical_accuracy"])
 
 

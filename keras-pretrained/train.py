@@ -216,12 +216,12 @@ else:
 
 print("[INFO] compiling model...")
 
-center_loss = get_center_loss(single_train_generator.data, single_train_generator.labels, CENTER_LOSS_ALPHA, CLASSES)
-softmax_loss = categorical_crossentropy(single_train_generator.labels, model)
-total_loss = softmax_loss + LAMBDA * center_loss
+center_loss = get_center_loss(CENTER_LOSS_ALPHA, CLASSES)
+# softmax_loss = categorical_crossentropy(single_train_generator.labels, model)
+# total_loss = softmax_loss + LAMBDA * center_loss
 
 opt = Adam(lr=INIT_LR)
-model.compile(loss=total_loss, optimizer=opt,
+model.compile(loss=center_loss, optimizer=opt,
               metrics=["accuracy", "top_k_categorical_accuracy"])
 
 

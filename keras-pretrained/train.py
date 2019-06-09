@@ -17,8 +17,6 @@ import os
 import cv2
 import numpy as np
 from sklearn.preprocessing import LabelBinarizer
-from imutils import paths
-import random
 
 # from dense_inception import DenseNetInception
 from dense_inception_concat import DenseNetInceptionInject, DenseNetBaseModel, DenseNetInceptionResnetModel,\
@@ -27,7 +25,7 @@ from dense_inception_concat import DenseNetInceptionInject, DenseNetBaseModel, D
 
 from utils import Params
 from loss_history import LossHistory
-from loss_fn import get_center_loss, get_sofmax_loss, get_total_loss
+from loss_fn import get_center_loss, get_softmax_loss, get_total_loss
 
 
 
@@ -85,6 +83,7 @@ params = Params(os.path.join(model_dir, 'params.json'))
 # config variables
 LAMBDA = 0.5
 CENTER_LOSS_ALPHA = 0.5
+LOSS_FN = params.loss_fn
 EPOCHS = params.num_epochs
 INIT_LR = params.learning_rate
 BS = params.batch_size
@@ -216,12 +215,15 @@ else:
 
 print("[INFO] compiling model...")
 
-# center_loss = get_center_loss(CENTER_LOSS_ALPHA, CLASSES)
-# softmax_loss = get_softmax_loss()
-total_loss = get_total_loss(LAMBDA, CENTER_LOSS_ALPHA, CLASSES)
+if LOSS_FN == 'center':
+    loss = get_center_loss(CENTER_LOSS_ALPHA, CLASSES)
+elif LOSS_FN == 'softmax':
+    loss = get_softmax_loss()
+else:
+    loss = get_total_loss(LAMBDA, CENTER_LOSS_ALPHA, CLASSES)
 
 opt = SGD(INIT_LR) #Adam(lr=INIT_LR)
-model.compile(loss=total_loss, optimizer=opt,
+model.compile(loss=loss, optimizer=opt,
               metrics=["accuracy", "top_k_categorical_accuracy"])
 
 

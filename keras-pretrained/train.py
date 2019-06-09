@@ -27,7 +27,7 @@ from dense_inception_concat import DenseNetInceptionInject, DenseNetBaseModel, D
 
 from utils import Params
 from loss_history import LossHistory
-from center_loss import get_center_loss
+from loss_fn import get_center_loss, get_sofmax_loss, get_total_loss
 
 
 
@@ -216,12 +216,12 @@ else:
 
 print("[INFO] compiling model...")
 
-center_loss = get_center_loss(CENTER_LOSS_ALPHA, CLASSES)
-# softmax_loss = categorical_crossentropy(single_train_generator.labels, model)
-# total_loss = softmax_loss + LAMBDA * center_loss
+# center_loss = get_center_loss(CENTER_LOSS_ALPHA, CLASSES)
+# softmax_loss = get_softmax_loss()
+total_loss = get_total_loss(LAMBDA, CENTER_LOSS_ALPHA, CLASSES)
 
 opt = SGD(INIT_LR) #Adam(lr=INIT_LR)
-model.compile(loss='categorical_crossentropy', optimizer=opt,
+model.compile(loss=total_loss, optimizer=opt,
               metrics=["accuracy", "top_k_categorical_accuracy"])
 
 

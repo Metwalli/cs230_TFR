@@ -184,8 +184,7 @@ print("[INFO] creating model...")
 overwriting = os.path.exists(history_filename) and restore_from is None
 assert not overwriting, "Weights found in model_dir, aborting to avoid overwrite"
 loss_history = LossHistory(history_filename)
-initial_epoch = loss_history.get_initial_epoch()
-EPOCHS += initial_epoch
+EPOCHS += loss_history.get_initial_epoch()
 
 if LOSS_FN == 'center':
     loss_fn = get_center_loss(CENTER_LOSS_ALPHA, CLASSES)
@@ -213,7 +212,7 @@ if restore_from is None:
         model = DenseNetInceptionInject(num_labels=CLASSES, use_imagenet_weights=use_imagenet_weights).model
 else:
     # Restore Model
-    file_path = os.path.join(restore_from, "best.weights.hdf5")
+    file_path = os.path.join(restore_from)
     assert os.path.exists(file_path), "No model in restore from directory"
     model = load_model(file_path, custom_objects={'loss_fn': loss_fn})
 
@@ -233,7 +232,7 @@ learning_rate = tf.train.exponential_decay(INIT_LR,
                            name='exponential_decay_learning_rate')
 # optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate, epsilon=1.1e-5)
 
-opt = Adam(lr=INIT_LR, decay=INIT_LR / EPOCHS)
+opt = Adam(lr=INIT_LR)
 # opt = SGD(INIT_LR) #Adam(lr=INIT_LR)
 model.compile(loss=loss_fn, optimizer=opt,
               metrics=["accuracy", "top_k_categorical_accuracy"])
@@ -243,22 +242,23 @@ tensorBoard = TensorBoard(log_dir=os.path.join(model_dir, 'logs/{}'.format(time.
 if not os.path.exists(os.path.join(model_dir, "checkpoints")):
     os.mkdir("checkpoints")
 
-best_checkpoint = ModelCheckpoint(os.path.join(model_dir, "checkpoints", "best.weights.hdf5"),
+best_checkpoint = ModelCheckpoint(os.path.join(model_dir, "best.weights.hdf5"),
                                   monitor='val_acc',
                                   period=save_period_step,
                                   verbose=1, save_best_only=True, mode='max')
-last_checkpoint = ModelCheckpoint(os.path.join(model_dir, "checkpoints", "last.weights.hdf5"),
+last_checkpoint = ModelCheckpoint(os.path.join(model_dir, "last.weights.hdf5"),
                                   monitor='val_acc',
                                   period=save_period_step,
                                   verbose=1, mode='max')
 
 print("[INFO] training started...")
+schedule = [0.50, 0.30, 0.20]
 if num_inputs > 1:
     # Train Multiple Inputs
     history = model.fit_generator(
             multi_train_generator,
             steps_per_epoch=single_train_generator.n // BS,
-            initial_epoch=initial_epoch,
+            initial_epoch=loss_history.get_initial_epoch(),
             epochs=EPOCHS,
             validation_data=multi_train_generator,
             validation_steps=single_validation_generator.n // BS,
@@ -266,19 +266,26 @@ if num_inputs > 1:
 
 else:
     # Train Single Input
+    lr = INIT_LR
+    for s in schedule:
+        opt = Adam(lr=lr)
+        # opt = SGD(INIT_LR) #Adam(lr=INIT_LR)
+        model.compile(loss=loss_fn, optimizer=opt,
+                      metrics=["accuracy", "top_k_categorical_accuracy"])
 
-    history = model.fit_generator(
-            single_train_generator,
-            steps_per_epoch=single_train_generator.n // BS,
-            initial_epoch=initial_epoch,
-            epochs=EPOCHS,
-            validation_data=single_validation_generator,
-            validation_steps=single_validation_generator.n // BS,
-            callbacks=[best_checkpoint, last_checkpoint, loss_history])
+        history = model.fit_generator(
+                single_train_generator,
+                steps_per_epoch=single_train_generator.n // BS,
+                initial_epoch=loss_history.get_initial_epoch(),
+                epochs=EPOCHS * s + loss_history.get_initial_epoch(),
+                validation_data=single_validation_generator,
+                validation_steps=single_validation_generator.n // BS,
+                callbacks=[best_checkpoint, last_checkpoint, loss_history])
+        lr *= 0.10
 
 # save the model to disk
 print("Saved model to disk")
-model.save(os.path.join(model_dir,  "checkpoints", "last.weights.hdf5"))
+model.save(os.path.join(model_dir, "last.weights.hdf5"))
 
 # plot the training Accuracy and loss
 

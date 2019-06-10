@@ -28,25 +28,23 @@ def get_center_loss(alpha, num_classes):
        (http://ydwen.github.io/papers/WenECCV16.pdf)
     """
 
-    @functools.wraps(_center_loss_func)
-    def center_loss(y_true, y_pred):
+    def loss_fn(y_true, y_pred):
         return _center_loss_func(y_pred, y_true, alpha, num_classes)
-
-    return center_loss
+    return loss_fn
 
 
 def get_softmax_loss():
-    def loss(y_true, y_pred):
+    def loss_fn(y_true, y_pred):
         return categorical_crossentropy(y_true, y_pred)
-    return loss
+    return loss_fn
 
 
 def get_total_loss(lamda, alpha, num_classes):
-    def get_loss(y_true, y_pred):
+    def loss_fn(y_true, y_pred):
         center_loss = _center_loss_func(y_pred, y_true, alpha, num_classes)
         softmax_loss = categorical_crossentropy(y_true, y_pred)
         sum = softmax_loss + lamda * center_loss
         return sum
 
-    return get_loss
+    return loss_fn
 

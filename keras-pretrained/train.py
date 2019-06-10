@@ -186,6 +186,14 @@ assert not overwriting, "Weights found in model_dir, aborting to avoid overwrite
 loss_history = LossHistory(history_filename)
 initial_epoch = loss_history.get_initial_epoch()
 EPOCHS += initial_epoch
+
+if LOSS_FN == 'center':
+    loss_fn = get_center_loss(CENTER_LOSS_ALPHA, CLASSES)
+elif LOSS_FN == 'softmax':
+    loss_fn = get_softmax_loss()
+else:
+    loss_fn = get_total_loss(LAMBDA, CENTER_LOSS_ALPHA, CLASSES)
+
 if restore_from is None:
     if model_name == 'densenet':
         model = DenseNetBaseModel(CLASSES, use_imagenet_weights).model
@@ -203,27 +211,31 @@ if restore_from is None:
         model = DenseNetDenseInception(params).model
     else:
         model = DenseNetInceptionInject(num_labels=CLASSES, use_imagenet_weights=use_imagenet_weights).model
-
 else:
     # Restore Model
     file_path = os.path.join(restore_from, "best.weights.hdf5")
     assert os.path.exists(file_path), "No model in restore from directory"
-    model = load_model(file_path)
+    model = load_model(file_path, custom_objects={'loss_fn': loss_fn})
 
 
 # Initial checkpoints and Tensorboard to monitor training
 
 print("[INFO] compiling model...")
 
-if LOSS_FN == 'center':
-    loss = get_center_loss(CENTER_LOSS_ALPHA, CLASSES)
-elif LOSS_FN == 'softmax':
-    loss = get_softmax_loss()
-else:
-    loss = get_total_loss(LAMBDA, CENTER_LOSS_ALPHA, CLASSES)
 
-opt = SGD(INIT_LR) #Adam(lr=INIT_LR)
-model.compile(loss=loss, optimizer=opt,
+global_step = tf.train.get_or_create_global_step()
+decay_steps = int(single_train_generator.n / BS * 2)
+learning_rate = tf.train.exponential_decay(INIT_LR,
+                           global_step,
+                           decay_steps,
+                           0.94,
+                           staircase=True,
+                           name='exponential_decay_learning_rate')
+# optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate, epsilon=1.1e-5)
+
+opt = Adam(lr=INIT_LR, decay=INIT_LR / EPOCHS)
+# opt = SGD(INIT_LR) #Adam(lr=INIT_LR)
+model.compile(loss=loss_fn, optimizer=opt,
               metrics=["accuracy", "top_k_categorical_accuracy"])
 
 

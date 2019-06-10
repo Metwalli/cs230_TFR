@@ -264,27 +264,14 @@ if num_inputs > 1:
 
 else:
     # Train Single Input
-    lr = INIT_LR
-    for s in schedule:
-        opt = Adam(lr=lr)
-        # opt = SGD(INIT_LR) #Adam(lr=INIT_LR)
-        model.compile(loss=loss_fn, optimizer=opt,
-                      metrics=["accuracy", "top_k_categorical_accuracy"])
-
-        lr *= 0.10
-        C_EPOCH = int(EPOCHS * s) - loss_history.get_initial_epoch()
-        if C_EPOCH > 0:
-            C_EPOCH += loss_history.get_initial_epoch()
-        else:
-            continue
-        history = model.fit_generator(
-                single_train_generator,
-                steps_per_epoch=single_train_generator.n // BS,
-                initial_epoch=loss_history.get_initial_epoch(),
-                epochs=C_EPOCH,
-                validation_data=single_validation_generator,
-                validation_steps=single_validation_generator.n // BS,
-                callbacks=[best_checkpoint, last_checkpoint, loss_history])
+    history = model.fit_generator(
+            single_train_generator,
+            steps_per_epoch=single_train_generator.n // BS,
+            initial_epoch=loss_history.get_initial_epoch(),
+            epochs=EPOCHS,
+            validation_data=single_validation_generator,
+            validation_steps=single_validation_generator.n // BS,
+            callbacks=[best_checkpoint, last_checkpoint, loss_history])
 
 # save the model to disk
 print("Saved model to disk")

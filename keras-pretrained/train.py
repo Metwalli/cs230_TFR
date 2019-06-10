@@ -9,7 +9,7 @@ from keras.optimizers import Adam, SGD
 from keras.preprocessing.image import img_to_array
 from keras.preprocessing.image import ImageDataGenerator
 from tensorflow.python.keras.callbacks import TensorBoard
-from keras.callbacks import ModelCheckpoint
+from keras.callbacks import ModelCheckpoint, LearningRateScheduler
 from keras.models import load_model
 from keras.losses import categorical_crossentropy
 import time
@@ -17,6 +17,7 @@ import os
 import cv2
 import numpy as np
 from sklearn.preprocessing import LabelBinarizer
+import math
 
 # from dense_inception import DenseNetInception
 from dense_inception_concat import DenseNetInceptionInject, DenseNetBaseModel, DenseNetInceptionResnetModel,\
@@ -128,54 +129,6 @@ single_validation_generator = test_datagen.flow_from_directory(
         batch_size=BS,
         class_mode='categorical')
 
-
-def generate_generator_multiple(generator, dir1, dir2, batch_size, img_height1, img_width1, img_height2=224, img_width2=224):
-    genX1 = generator.flow_from_directory(dir1,
-                                          target_size=(img_height1, img_width1),
-                                          class_mode='categorical',
-                                          batch_size=batch_size,
-                                          shuffle=False,
-                                          seed=7)
-
-    genX2 = generator.flow_from_directory(dir2,
-                                          target_size=(img_height2, img_width2),
-                                          class_mode='categorical',
-                                          batch_size=batch_size,
-                                          shuffle=False,
-                                          seed=7)
-
-    while True:
-        X1i = genX1.next()
-        X2i = genX2.next()
-        yield [X1i[0], X2i[0]], X2i[1]  # Yield both images and their mutual label
-
-
-multi_train_generator = generate_generator_multiple(generator=train_datagen,
-                                            dir1=train_dir,
-                                            dir2=train_dir,
-                                            batch_size=BS,
-                                            img_height1=INPUT1_DIMS[1],
-                                            img_width1=INPUT1_DIMS[1],
-                                            img_height2=INPUT2_DIMS[1],
-                                            img_width2=INPUT2_DIMS[1])
-
-multi_validation_generator = generate_generator_multiple(test_datagen,
-                                             dir1=train_dir,
-                                             dir2=train_dir,
-                                             batch_size=BS,
-                                             img_height1=INPUT1_DIMS[1],
-                                             img_width1=INPUT1_DIMS[1],
-                                             img_height2=INPUT2_DIMS[1],
-                                             img_width2=INPUT2_DIMS[1])
-
-# grab the test image paths and randomly shuffle them
-# imagePaths = sorted(list(paths.list_images(os.path.join(data_dir, "test"))))
-# random.seed(42)
-# random.shuffle(imagePaths)
-# validation_X, validation_Y, lb = load_dataset(imagePaths)
-# tensorBoard = TensorBoardWrapper(validation_generator, nb_steps=5, log_dir=os.path.join(model_dir, 'logs/{}'.format(time.time())), histogram_freq=1,
-#                                batch_size=32, write_graph=False, write_grads=True)
-
 CLASSES = single_train_generator.num_classes
 params.num_labels = CLASSES
 
@@ -222,17 +175,15 @@ else:
 print("[INFO] compiling model...")
 
 
-global_step = tf.train.get_or_create_global_step()
-decay_steps = int(single_train_generator.n / BS * 2)
-learning_rate = tf.train.exponential_decay(INIT_LR,
-                           global_step,
-                           decay_steps,
-                           0.94,
-                           staircase=True,
-                           name='exponential_decay_learning_rate')
-# optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate, epsilon=1.1e-5)
+def step_decay(epoch):
+    initial_lrate = INIT_LR
+    drop = 0.5
+    epochs_drop = 10.0
+    lrate = initial_lrate * math.pow(drop, math.floor((1+epoch)/epochs_drop))
+    return lrate
+lrate = LearningRateScheduler(step_decay)
 
-opt = Adam(lr=INIT_LR)
+opt = Adam(lr=0.0, decay=0.0)
 # opt = SGD(INIT_LR) #Adam(lr=INIT_LR)
 model.compile(loss=loss_fn, optimizer=opt,
               metrics=["accuracy", "top_k_categorical_accuracy"])
@@ -250,28 +201,16 @@ last_checkpoint = ModelCheckpoint(os.path.join(model_dir, "last.weights.hdf5"),
                                   verbose=1, mode='max')
 
 print("[INFO] training started...")
-schedule = [0.5, 0.8, 1]
-if num_inputs > 1:
-    # Train Multiple Inputs
-    history = model.fit_generator(
-            multi_train_generator,
-            steps_per_epoch=single_train_generator.n // BS,
-            initial_epoch=loss_history.get_initial_epoch(),
-            epochs=EPOCHS,
-            validation_data=multi_train_generator,
-            validation_steps=single_validation_generator.n // BS,
-            callbacks=[best_checkpoint, last_checkpoint, loss_history, tensorBoard])
 
-else:
-    # Train Single Input
-    history = model.fit_generator(
-            single_train_generator,
-            steps_per_epoch=single_train_generator.n // BS,
-            initial_epoch=loss_history.get_initial_epoch(),
-            epochs=EPOCHS,
-            validation_data=single_validation_generator,
-            validation_steps=single_validation_generator.n // BS,
-            callbacks=[best_checkpoint, last_checkpoint, loss_history])
+history = model.fit_generator(
+        single_train_generator,
+        steps_per_epoch=single_train_generator.n // BS,
+        initial_epoch=loss_history.get_initial_epoch(),
+        epochs=EPOCHS,
+        validation_data=single_validation_generator,
+        validation_steps=single_validation_generator.n // BS,
+        callbacks=[best_checkpoint, last_checkpoint, loss_history, lrate])
+
 
 # save the model to disk
 print("Saved model to disk")

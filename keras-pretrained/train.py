@@ -175,13 +175,20 @@ else:
 print("[INFO] compiling model...")
 
 
+def cosine_decay(epoch):
+    initial_lrate = INIT_LR
+    lrate = 0.5 * initial_lrate * (1 + math.cos(epoch*math.pi/EPOCHS))
+    return lrate
 def step_decay(epoch):
     initial_lrate = INIT_LR
     drop = 0.5
     epochs_drop = 10.0
     lrate = initial_lrate * math.pow(drop, math.floor((1+epoch)/epochs_drop))
     return lrate
-lrate = LearningRateScheduler(step_decay)
+if params.decay == 'step':
+    lrate = LearningRateScheduler(step_decay)
+else:
+    lrate = LearningRateScheduler(cosine_decay)
 
 opt = Adam(lr=0.0, decay=0.0)
 # opt = SGD(INIT_LR) #Adam(lr=INIT_LR)

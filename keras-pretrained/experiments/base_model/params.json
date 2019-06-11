@@ -10,7 +10,7 @@
     "bn_momentum": 0.9,
     "dropout_rate": 0.5,
     "compression_rate": 1.0,
-    "num_layers_per_block": [1, 1, 1, 1],
+    "num_layers_per_block": [6, 8, 8, 1],
 
     "image1_size": 224,
     "image2_size": 224,
@@ -25,7 +25,9 @@
     "results_path": "output/results.txt",
     "model_path"      : "output/model",
     "classifier_path" : "output/classifier",
-    "use_imagenet_weights": true,
-    "num_inputs" : 1
+    "use_imagenet_weights": false,
+    "num_inputs" : 1,
+    "loss_fn": "softmax",
+    "decay": "cosine"
 
 }
